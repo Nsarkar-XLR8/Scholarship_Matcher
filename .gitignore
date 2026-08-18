@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+.pnpm-store/
+
+# Build Outputs
+dist/
+build/
+.next/
+frontend/.next/
+out/
+frontend/out/
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+frontend/.env.local
+*.pem
+
+# IDE & OS Garbage
+.DS_Store
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs & Diagnostics
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Test Coverage
+coverage/
+.nyc_output/
+
+# Temporary & Cache
+.cache/
+.turbo/
+frontend/.turbo/
+.tsbuildinfo
+dist/tsconfig.tsbuildinfo

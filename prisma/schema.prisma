@@ -1,0 +1,289 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// GEOGRAPHIC TAXONOMY (UN M49 & ISO 3166-1)
+// ==========================================
+
+model Continent {
+  id        String   @id @default(uuid())
+  code      String   @unique // e.g. "EU", "NA", "AS"
+  name      String   // e.g. "Europe", "North America", "Asia"
+  unM49Code String   @unique // e.g. "150"
+  regions   Region[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Region {
+  id          String    @id @default(uuid())
+  code        String    @unique // e.g. "WEU", "EEU", "SEAsia"
+  name        String    // e.g. "Western Europe"
+  continentId String
+  continent   Continent @relation(fields: [continentId], references: [id])
+  countries   Country[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Country {
+  id                    String            @id @default(uuid())
+  isoCode               String            @unique // 2-letter ISO 3166-1 e.g. "DE", "GB", "US", "MY"
+  iso3Code              String            @unique // 3-letter e.g. "DEU", "GBR", "USA", "MYS"
+  name                  String            // e.g. "Germany"
+  regionId              String
+  region                Region            @relation(fields: [regionId], references: [id])
+  currencyCode          String            @default("USD") // e.g. "EUR", "GBP", "MYR"
+  avgTuitionMinUsd      Float             @default(0.0)
+  avgTuitionMaxUsd      Float             @default(0.0)
+  estMonthlyLivingCostUsd Float           @default(0.0)
+  dataCompletenessPct   Float             @default(0.0) // Data coverage % (0-100)
+
+  universities          University[]
+  campuses              Campus[]
+  scholarshipRules      ScholarshipRule[] // Country-scope scholarships (e.g. DAAD, Chevening)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([regionId])
+}
+
+// ==========================================
+// INSTITUTIONAL HIERARCHY & CAMPUSES
+// ==========================================
+
+model University {
+  id              String   @id @default(uuid())
+  name            String
+  domain          String   @unique // e.g. "tum.de"
+  primaryCountryId String
+  primaryCountry  Country  @relation(fields: [primaryCountryId], references: [id])
+  openAlexId      String?  // e.g. "I12345678"
+  rankingQs       Int?
+  rankingTimes    Int?
+
+  campuses        Campus[]
+  programs        Program[]
+  scholarshipRules ScholarshipRule[] // University-wide scholarships
+  crawlLogs       CrawlLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([primaryCountryId])
+}
+
+model Campus {
+  id           String     @id @default(uuid())
+  universityId String
+  university   University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  countryId    String
+  country      Country    @relation(fields: [countryId], references: [id])
+  name         String     // e.g. "Main Campus", "Abu Dhabi Campus", "Malaysia Campus"
+  city         String
+
+  programs     Program[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([universityId])
+  @@index([countryId])
+}
+
+// ==========================================
+// ACADEMIC PROGRAMS & VERSIONED REQUIREMENTS
+// ==========================================
+
+enum DegreeLevel {
+  MASTERS
+  MS
+  MENG
+  MBA
+}
+
+model Program {
+  id             String               @id @default(uuid())
+  universityId   String
+  university     University           @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  campusId       String
+  campus         Campus               @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  title          String               // e.g. "M.Sc. Computer Science"
+  degreeLevel    DegreeLevel          @default(MS)
+  fieldOfStudy   String               // e.g. "Computer Science", "Data Science"
+  durationMonths Int                  @default(24)
+  language       String               @default("English")
+  tuitionFeeLocal Float               @default(0.0)
+  currencyCode   String               @default("EUR")
+  sourceUrl      String
+  isActive       Boolean              @default(true)
+
+  requirements   ProgramRequirement[]
+  scholarshipRules ScholarshipRule[]  // Program-specific scholarships
+  outcomeReports OutcomeReport[]
+  auditLogs      RequirementAuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, fieldOfStudy])
+  @@index([universityId])
+  @@index([campusId])
+}
+
+enum ConfidenceLevel {
+  VERIFIED
+  SCRAPED_UNVERIFIED
+  CROWDSOURCED
+}
+
+model ProgramRequirement {
+  id              String          @id @default(uuid())
+  programId       String
+  program         Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  minGpa          Float           @default(0.0) // Normalized to 4.0 scale
+  minGpaOriginal  Float           @default(0.0)
+  gpaScale        Float           @default(4.0)
+  minIelts        Float?
+  minToefl        Int?
+  minGre          Int?
+  requiresPapers  Boolean         @default(false)
+  minPapersCount  Int             @default(0)
+  sourceUrl       String
+  confidence      ConfidenceLevel @default(VERIFIED)
+  validFrom       DateTime        @default(now())
+  validTo         DateTime?       // NULL indicates current active requirement
+
+  createdAt DateTime @default(now())
+
+  @@index([programId, validTo])
+  @@index([minGpa])
+}
+
+// ==========================================
+// SCHOLARSHIP RULES & MULTI-SCOPED RULES
+// ==========================================
+
+enum ScholarshipScope {
+  PROGRAM
+  UNIVERSITY
+  COUNTRY
+  GLOBAL
+}
+
+enum ScholarshipType {
+  TIERED_FORMULA
+  HOLISTIC
+  NEED_BASED
+  TUITION_WAIVER
+}
+
+enum CoverageType {
+  FULL_TUITION
+  PARTIAL_PERCENT
+  FIXED_AMOUNT
+  STIPEND_ONLY
+}
+
+model ScholarshipRule {
+  id             String           @id @default(uuid())
+  title          String
+  scope          ScholarshipScope @default(UNIVERSITY)
+  type           ScholarshipType  @default(HOLISTIC)
+  coverageType   CoverageType     @default(PARTIAL_PERCENT)
+
+  programId      String?
+  program        Program?         @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  universityId   String?
+  university     University?      @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  countryId      String?
+  country        Country?         @relation(fields: [countryId], references: [id], onDelete: Cascade)
+
+  fundingPctMin  Float            @default(0.0)
+  fundingPctMax  Float            @default(100.0)
+  fixedAmountUsd Float?
+
+  // Store JSON criteria e.g. [{"minGpa": 3.5, "fundingPct": 50.0}, {"minGpa": 3.8, "fundingPct": 100.0}]
+  tierCriteriaJson Json?
+  description    String?          @db.Text
+  sourceUrl      String
+  confidence     ConfidenceLevel  @default(VERIFIED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scope, countryId])
+  @@index([universityId])
+  @@index([programId])
+}
+
+// ==========================================
+// CROWDSOURCED OUTCOME REPORTS
+// ==========================================
+
+enum OutcomeVerificationStatus {
+  VERIFIED
+  PENDING_REVIEW
+  FLAGGED_OUTLIER
+}
+
+model OutcomeReport {
+  id                    String                    @id @default(uuid())
+  userAnonHash          String                    // Cryptographic hash of IP/client fingerprint
+  programId             String
+  program               Program                   @relation(fields: [programId], references: [id], onDelete: Cascade)
+  reportedGpa           Float
+  reportedGpaScale      Float                     @default(4.0)
+  reportedIelts         Float?
+  reportedToefl         Int?
+  reportedGre           Int?
+  reportedPapersCount   Int                       @default(0)
+  scholarshipPctReceived Float                     @default(0.0)
+  admitCycleYear        Int
+  verificationStatus    OutcomeVerificationStatus @default(VERIFIED)
+
+  createdAt DateTime @default(now())
+
+  @@index([programId, verificationStatus])
+}
+
+// ==========================================
+// AUDIT LEDGER & CRAWL LOGS
+// ==========================================
+
+model CrawlLog {
+  id             String     @id @default(uuid())
+  universityId   String
+  university     University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  url            String
+  contentHash    String
+  httpStatus     Int        @default(200)
+  changeDetected Boolean    @default(false)
+  crawledAt      DateTime   @default(now())
+
+  @@index([universityId, url])
+}
+
+model RequirementAuditLog {
+  id                  String   @id @default(uuid())
+  programId           String
+  program             Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  oldRequirementId    String?
+  newRequirementId    String
+  extractionDiffJson  Json
+  performedBy         String   @default("AUTOMATED_STAGE_B_PARSER")
+  createdAt           DateTime @default(now())
+
+  @@index([programId])
+}

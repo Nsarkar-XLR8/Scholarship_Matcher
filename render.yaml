@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: scholarship-matcher-api
+    runtime: node
+    plan: free
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm run start:prod
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: scholarship-matcher-db
+          property: connectionString
+      - key: REDIS_HOST
+        value: localhost
+      - key: REDIS_PORT
+        value: 6379
+      - key: RABBITMQ_URL
+        value: amqp://guest:guest@localhost:5672
+      - key: OPENSEARCH_NODE
+        value: http://localhost:9200
+      - key: FRANKFURTER_FX_URL
+        value: https://api.frankfurter.app
+      - key: HIPOLABS_API_URL
+        value: http://universities.hipolabs.com
+      - key: OPENALEX_API_URL
+        value: https://api.openalex.org
+
+databases:
+  - name: scholarship-matcher-db
+    plan: free
