@@ -10,6 +10,8 @@ export interface MatchResultItem {
   fieldOfStudy: string;
   universityName: string;
   domain: string;
+  officialWebsiteUrl?: string | null;
+  sourceUrl?: string | null;
   campusName: string;
   countryName: string;
   countryIsoCode: string;
@@ -181,6 +183,8 @@ export class MatchingService {
         fieldOfStudy: program.fieldOfStudy,
         universityName: program.university.name,
         domain: program.university.domain,
+        officialWebsiteUrl: program.university.domain ? `https://${program.university.domain.replace(/^https?:\/\//i, '')}` : null,
+        sourceUrl: program.sourceUrl,
         campusName: program.campus.name,
         countryName: program.campus.country.name,
         countryIsoCode: program.campus.country.isoCode,

@@ -105,6 +105,16 @@ export default function TaxonomyPage() {
                         />
                       </div>
                     </div>
+
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                      <a
+                        href={`/search?country=${country.isoCode}`}
+                        className="text-xs font-bold text-royal hover:underline flex items-center gap-1"
+                      >
+                        <span>View Programs & Official Portals</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
                   </motion.div>
                 ))}
               </div>

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, Sparkles, Search, Layers, Columns3, Menu, X, GraduationCap } from 'lucide-react';
+import { Compass, Sparkles, Search, Layers, Columns3, Menu, X, GraduationCap, TrendingUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Navbar() {
@@ -16,6 +16,7 @@ export default function Navbar() {
     { href: '/search', label: 'Explore Programs', icon: Search },
     { href: '/taxonomy', label: 'UN Geography', icon: Layers },
     { href: '/comparison', label: 'Country Matrix', icon: Columns3 },
+    { href: '/outcomes', label: 'Yield Outcomes', icon: TrendingUp },
   ];
 
   return (

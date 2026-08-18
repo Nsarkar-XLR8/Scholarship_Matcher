@@ -99,6 +99,9 @@ export class SearchService {
         minGre: p.requirements[0]?.minGre || null,
         tuitionFeeLocal: p.tuitionFeeLocal,
         currencyCode: p.currencyCode,
+        domain: p.university.domain,
+        officialWebsiteUrl: p.university.domain ? `https://${p.university.domain.replace(/^https?:\/\//i, '')}` : null,
+        sourceUrl: p.sourceUrl,
         scholarshipRulesCount: p.scholarshipRules.length,
       })),
     };

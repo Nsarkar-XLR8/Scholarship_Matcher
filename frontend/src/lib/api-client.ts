@@ -42,6 +42,8 @@ export interface MatchResult {
     fieldOfStudy: string;
     universityName: string;
     domain: string;
+    officialWebsiteUrl?: string;
+    sourceUrl?: string;
     campusName: string;
     countryName: string;
     countryIsoCode: string;

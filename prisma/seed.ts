@@ -445,22 +445,231 @@ async function main() {
     },
   });
 
+  // Program 5: TUM M.Sc. Data Engineering & Analytics
+  const tumDs = await prisma.program.create({
+    data: {
+      universityId: tum.id,
+      campusId: tumMainCampus.id,
+      title: 'M.Sc. Data Engineering and Analytics',
+      degreeLevel: DegreeLevel.MS,
+      fieldOfStudy: 'Data Science & AI',
+      durationMonths: 24,
+      language: 'English',
+      tuitionFeeLocal: 6000.0,
+      currencyCode: 'EUR',
+      sourceUrl: 'https://www.cit.tum.de/en/cit/studies/degree-programs/master-data-engineering-analytics/',
+    },
+  });
+
+  await prisma.programRequirement.create({
+    data: {
+      programId: tumDs.id,
+      minGpa: 3.3,
+      minGpaOriginal: 2.3,
+      gpaScale: 4.0,
+      minIelts: 7.0,
+      minToefl: 95,
+      minGre: 320,
+      requiresPapers: false,
+      minPapersCount: 0,
+      sourceUrl: 'https://www.cit.tum.de/en/cit/studies/degree-programs/master-data-engineering-analytics/',
+      confidence: ConfidenceLevel.VERIFIED,
+      validFrom: new Date('2024-01-01'),
+    },
+  });
+
   await prisma.scholarshipRule.create({
     data: {
-      title: 'Monash Graduate Merit Scholarship Formula',
+      title: 'TUM Data Science Excellence Grant',
       scope: ScholarshipScope.PROGRAM,
-      type: ScholarshipType.TIERED_FORMULA,
-      coverageType: CoverageType.PARTIAL_PERCENT,
-      programId: monashCs.id,
-      fundingPctMin: 25.0,
-      fundingPctMax: 50.0,
-      tierCriteriaJson: [
-        { minGpa: 3.5, fundingPct: 25.0, description: 'GPA >= 3.5 grants 25% tuition waiver' },
-        { minGpa: 3.8, fundingPct: 50.0, description: 'GPA >= 3.8 grants 50% tuition waiver' },
-      ],
-      description: 'Automatic published tier scholarship based on undergraduate GPA.',
-      sourceUrl: 'https://www.monash.edu.my/student-services/financial-assistance/scholarships',
+      type: ScholarshipType.TUITION_WAIVER,
+      coverageType: CoverageType.FULL_TUITION,
+      programId: tumDs.id,
+      fundingPctMin: 100.0,
+      fundingPctMax: 100.0,
+      description: '100% tuition waiver for top 5% applicants in Data Engineering.',
+      sourceUrl: 'https://www.tum.de/en/studies/fees-and-financial-aid/scholarships',
       confidence: ConfidenceLevel.VERIFIED,
+    },
+  });
+
+  // Program 6: TU Delft M.Sc. Electrical Engineering
+  const tudelftEe = await prisma.program.create({
+    data: {
+      universityId: tudelft.id,
+      campusId: tudelftCampus.id,
+      title: 'M.Sc. Electrical Engineering',
+      degreeLevel: DegreeLevel.MS,
+      fieldOfStudy: 'Electrical Engineering',
+      durationMonths: 24,
+      language: 'English',
+      tuitionFeeLocal: 20500.0,
+      currencyCode: 'EUR',
+      sourceUrl: 'https://www.tudelft.nl/en/education/programmes/masters/electrical-engineering',
+    },
+  });
+
+  await prisma.programRequirement.create({
+    data: {
+      programId: tudelftEe.id,
+      minGpa: 3.2,
+      minGpaOriginal: 75.0,
+      gpaScale: 4.0,
+      minIelts: 6.5,
+      minToefl: 90,
+      minGre: 315,
+      requiresPapers: false,
+      minPapersCount: 0,
+      sourceUrl: 'https://www.tudelft.nl/en/education/admission-and-application',
+      confidence: ConfidenceLevel.VERIFIED,
+      validFrom: new Date('2024-01-01'),
+    },
+  });
+
+  // Program 7: Imperial M.Sc. Financial Technology & Analytics
+  const imperialFintech = await prisma.program.create({
+    data: {
+      universityId: imperial.id,
+      campusId: imperialCampus.id,
+      title: 'M.Sc. Financial Technology & Business Analytics',
+      degreeLevel: DegreeLevel.MS,
+      fieldOfStudy: 'Business Analytics',
+      durationMonths: 12,
+      language: 'English',
+      tuitionFeeLocal: 42000.0,
+      currencyCode: 'GBP',
+      sourceUrl: 'https://www.imperial.ac.uk/business-school/programmes/msc-financial-technology/',
+    },
+  });
+
+  await prisma.programRequirement.create({
+    data: {
+      programId: imperialFintech.id,
+      minGpa: 3.5,
+      minGpaOriginal: 3.5,
+      gpaScale: 4.0,
+      minIelts: 7.5,
+      minToefl: 105,
+      minGre: 325,
+      requiresPapers: false,
+      minPapersCount: 0,
+      sourceUrl: 'https://www.imperial.ac.uk/business-school/programmes/msc-financial-technology/admissions/',
+      confidence: ConfidenceLevel.VERIFIED,
+      validFrom: new Date('2024-01-01'),
+    },
+  });
+
+  await prisma.scholarshipRule.create({
+    data: {
+      title: 'Imperial Business School Dean’s Excellence Award',
+      scope: ScholarshipScope.PROGRAM,
+      type: ScholarshipType.HOLISTIC,
+      coverageType: CoverageType.PARTIAL_PERCENT,
+      programId: imperialFintech.id,
+      fundingPctMin: 50.0,
+      fundingPctMax: 50.0,
+      description: '50% tuition reduction for candidates with outstanding academic merit.',
+      sourceUrl: 'https://www.imperial.ac.uk/business-school/programmes/msc-financial-technology/fees-and-funding/',
+      confidence: ConfidenceLevel.VERIFIED,
+    },
+  });
+
+  // Program 8: MIT Master of Business Analytics (MBAn)
+  const mitMban = await prisma.program.create({
+    data: {
+      universityId: mit.id,
+      campusId: mitCampus.id,
+      title: 'Master of Business Analytics (MBAn)',
+      degreeLevel: DegreeLevel.MS,
+      fieldOfStudy: 'Business Analytics',
+      durationMonths: 12,
+      language: 'English',
+      tuitionFeeLocal: 86000.0,
+      currencyCode: 'USD',
+      sourceUrl: 'https://mitsloan.mit.edu/mban',
+    },
+  });
+
+  await prisma.programRequirement.create({
+    data: {
+      programId: mitMban.id,
+      minGpa: 3.7,
+      minGpaOriginal: 3.7,
+      gpaScale: 4.0,
+      minIelts: 7.5,
+      minToefl: 105,
+      minGre: 328,
+      requiresPapers: true,
+      minPapersCount: 1,
+      sourceUrl: 'https://mitsloan.mit.edu/mban/admissions',
+      confidence: ConfidenceLevel.VERIFIED,
+      validFrom: new Date('2024-01-01'),
+    },
+  });
+
+  // Program 9: TU Delft M.Sc. Sustainable Energy Technology
+  const tudelftEnergy = await prisma.program.create({
+    data: {
+      universityId: tudelft.id,
+      campusId: tudelftCampus.id,
+      title: 'M.Sc. Sustainable Energy Technology',
+      degreeLevel: DegreeLevel.MS,
+      fieldOfStudy: 'Environmental Science',
+      durationMonths: 24,
+      language: 'English',
+      tuitionFeeLocal: 20500.0,
+      currencyCode: 'EUR',
+      sourceUrl: 'https://www.tudelft.nl/en/education/programmes/masters/sustainable-energy-technology',
+    },
+  });
+
+  await prisma.programRequirement.create({
+    data: {
+      programId: tudelftEnergy.id,
+      minGpa: 3.1,
+      minGpaOriginal: 75.0,
+      gpaScale: 4.0,
+      minIelts: 6.5,
+      minToefl: 90,
+      minGre: null,
+      requiresPapers: false,
+      minPapersCount: 0,
+      sourceUrl: 'https://www.tudelft.nl/en/education/admission-and-application',
+      confidence: ConfidenceLevel.VERIFIED,
+      validFrom: new Date('2024-01-01'),
+    },
+  });
+
+  // Program 10: TUM M.Sc. Biomedical Engineering
+  const tumBio = await prisma.program.create({
+    data: {
+      universityId: tum.id,
+      campusId: tumMainCampus.id,
+      title: 'M.Sc. Biomedical Engineering and Medical Physics',
+      degreeLevel: DegreeLevel.MS,
+      fieldOfStudy: 'Biomedical Engineering',
+      durationMonths: 24,
+      language: 'English',
+      tuitionFeeLocal: 6000.0,
+      currencyCode: 'EUR',
+      sourceUrl: 'https://www.nat.tum.de/en/nat/studies/degree-programs/master-biomedical-engineering/',
+    },
+  });
+
+  await prisma.programRequirement.create({
+    data: {
+      programId: tumBio.id,
+      minGpa: 3.2,
+      minGpaOriginal: 2.5,
+      gpaScale: 4.0,
+      minIelts: 6.5,
+      minToefl: 88,
+      minGre: 312,
+      requiresPapers: false,
+      minPapersCount: 0,
+      sourceUrl: 'https://www.nat.tum.de/en/nat/studies/degree-programs/master-biomedical-engineering/',
+      confidence: ConfidenceLevel.VERIFIED,
+      validFrom: new Date('2024-01-01'),
     },
   });
 

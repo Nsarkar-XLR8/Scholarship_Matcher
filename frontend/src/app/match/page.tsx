@@ -1,11 +1,23 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Sparkles, GraduationCap, Globe, BookOpen, Award, ExternalLink, CheckCircle, AlertTriangle, ArrowRight, ShieldCheck, RefreshCw } from 'lucide-react';
+import { Sparkles, GraduationCap, Globe, BookOpen, Award, ExternalLink, CheckCircle, AlertTriangle, ArrowRight, ShieldCheck, RefreshCw, BarChart2, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ConfidenceBadge from '@/components/common/ConfidenceBadge';
+import SearchableSelect, { SelectOption } from '@/components/common/SearchableSelect';
 import { evaluateProfileMatch, MatchResult } from '@/lib/api-client';
+import { formatOfficialUrl } from '@/lib/url-formatter.util';
+
+const FIELD_OPTIONS: SelectOption[] = [
+  { value: 'Computer Science', label: 'Computer Science', sublabel: 'STEM / Technology' },
+  { value: 'Data Science & AI', label: 'Data Science & Artificial Intelligence', sublabel: 'STEM / Analytics' },
+  { value: 'Electrical Engineering', label: 'Electrical Engineering', sublabel: 'Engineering' },
+  { value: 'Biomedical Engineering', label: 'Biomedical Engineering', sublabel: 'Engineering / Life Sciences' },
+  { value: 'Business Analytics', label: 'Business Analytics & Finance', sublabel: 'Business / Finance' },
+  { value: 'Public Policy', label: 'Public Policy & Governance', sublabel: 'Social Sciences' },
+  { value: 'Environmental Science', label: 'Environmental & Energy Science', sublabel: 'Sustainability' },
+];
 
 function MatchContent() {
   const searchParams = useSearchParams();
@@ -19,13 +31,15 @@ function MatchContent() {
   const [targetField, setTargetField] = useState<string>(searchParams.get('field') || 'Computer Science');
   const [preferredCountries, setPreferredCountries] = useState<string[]>(['DE', 'NL', 'GB', 'US', 'MY']);
 
+  // Match Filter Tab State
+  const [activeTab, setActiveTab] = useState<'ALL' | 'QUALIFIED' | 'REACH' | 'SAFETY'>('ALL');
+
   // Match Evaluation State
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleEvaluate = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const handleEvaluate = useCallback(async () => {
     setIsLoading(true);
     setErrorMsg(null);
 
@@ -36,8 +50,8 @@ function MatchContent() {
         ielts,
         gre,
         papersCount,
-        targetField,
-        preferredCountryIsoCodes: preferredCountries,
+        targetField: targetField || 'Computer Science',
+        preferredCountryIsoCodes: preferredCountries.length > 0 ? preferredCountries : ['DE', 'NL', 'GB', 'US', 'MY'],
       });
 
       setMatchResult(data);
@@ -46,17 +60,27 @@ function MatchContent() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [gpa, gpaScale, ielts, gre, papersCount, targetField, preferredCountries]);
 
+  // Debounced auto-evaluation on form change
   useEffect(() => {
-    handleEvaluate();
-  }, []);
+    const timer = setTimeout(() => {
+      handleEvaluate();
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [handleEvaluate]);
+
+  // Filtered Programs based on active tab
+  const filteredMatches = matchResult?.matches?.filter((m: any) => {
+    if (activeTab === 'ALL') return true;
+    return m.qualificationStatus === activeTab;
+  }) || [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-8 py-10">
       {/* Header */}
       <div className="text-center max-w-3xl mx-auto mb-10">
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-royal text-xs font-semibold mb-4 shadow-sm">
+        <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-royal text-xs font-semibold mb-4 shadow-sm">
           <Sparkles className="w-3.5 h-3.5" />
           Multi-Scoped Eligibility & Scholarship Engine
         </span>
@@ -64,18 +88,21 @@ function MatchContent() {
           Evaluate Your Master’s Fit
         </h1>
         <p className="text-slate-600 text-sm sm:text-base">
-          Our algorithm normalizes your GPA, checks published program requirements, and joins program, university, country, and global scholarship rules.
+          Our algorithm normalizes your GPA to a 4.0 scale, evaluates language/research fit, and joins program, university, country, and global scholarship rules.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Column: Interactive Form Controls */}
         <div className="lg:col-span-4">
-          <form onSubmit={handleEvaluate} className="glass-panel p-6 rounded-3xl border border-slate-200 space-y-6 sticky top-24 shadow-xl">
-            <h3 className="text-lg font-bold font-outfit text-slate-navy flex items-center gap-2 border-b border-slate-100 pb-3">
-              <GraduationCap className="w-5 h-5 text-royal" />
-              Student Profile
-            </h3>
+          <div className="glass-panel p-6 rounded-3xl border border-slate-200 space-y-6 sticky top-24 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-lg font-bold font-outfit text-slate-navy flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-royal" />
+                Student Profile
+              </h3>
+              {isLoading && <RefreshCw className="w-4 h-4 text-royal animate-spin" />}
+            </div>
 
             {/* GPA & Scale */}
             <div className="space-y-2">
@@ -144,7 +171,7 @@ function MatchContent() {
 
             {/* Research Papers */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Published Research Papers (DOI)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Published Research Papers</label>
               <input
                 type="number"
                 min="0"
@@ -154,20 +181,18 @@ function MatchContent() {
               />
             </div>
 
-            {/* Target Field */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Target Field of Study</label>
-              <input
-                type="text"
-                value={targetField}
-                onChange={(e) => setTargetField(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 font-semibold focus:border-royal focus:outline-none shadow-sm"
-                placeholder="Computer Science, Data..."
-                required
-              />
-            </div>
+            {/* Searchable Target Field */}
+            <SearchableSelect
+              options={FIELD_OPTIONS}
+              value={targetField}
+              onChange={(val) => setTargetField(val)}
+              label="Target Field of Study"
+              placeholder="Select field of study..."
+              searchPlaceholder="Search study field..."
+              icon={<GraduationCap className="w-4 h-4" />}
+            />
 
-            {/* Preferred Countries */}
+            {/* Preferred Countries Toggle */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-2">Preferred Destinations</label>
               <div className="flex flex-wrap gap-2">
@@ -190,9 +215,9 @@ function MatchContent() {
                           setPreferredCountries([...preferredCountries, country.code]);
                         }
                       }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                         isSelected
-                          ? 'bg-blue-600 text-white border border-blue-600 shadow-sm'
+                          ? 'bg-gradient-to-r from-blue-600 to-royal text-white shadow-sm'
                           : 'bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200'
                       }`}
                     >
@@ -203,165 +228,211 @@ function MatchContent() {
               </div>
             </div>
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-blue-600 via-royal to-sky-glow text-white font-bold text-sm tracking-wide shadow-lg shadow-blue-500/25 hover:scale-[1.02] transition-transform disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Evaluating Algorithm...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  <span>Run Eligibility Match</span>
-                </>
-              )}
-            </button>
-          </form>
+            {/* Normalized GPA Meter */}
+            {matchResult?.normalizedGpa4Scale !== undefined && (
+              <div className="p-4 rounded-2xl bg-blue-50/80 border border-blue-200 text-xs space-y-1 font-mono">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-600">Normalized 4.0 GPA:</span>
+                  <span className="text-royal font-extrabold text-sm">{matchResult.normalizedGpa4Scale.toFixed(2)}</span>
+                </div>
+                <div className="w-full bg-blue-200 rounded-full h-2 overflow-hidden mt-1">
+                  <div
+                    className="bg-gradient-to-r from-blue-600 to-royal h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${(matchResult.normalizedGpa4Scale / 4.0) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Right Column: Dynamic Results Grid */}
-        <div className="lg:col-span-8 space-y-6">
+        {/* Right Column: Match Evaluation Results */}
+        <div className="lg:col-span-8">
           {errorMsg && (
-            <div className="glass-panel p-4 rounded-2xl border border-rose-200 bg-rose-50 text-rose-800 text-sm flex items-center gap-3 shadow-sm">
-              <AlertTriangle className="w-5 h-5 shrink-0 text-rose-600" />
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium mb-6 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
+          {/* Results Summary & Filter Tabs */}
           {matchResult && (
-            <div className="flex items-center justify-between glass-panel p-4 rounded-2xl border border-blue-200 bg-blue-50/50">
-              <div className="text-xs text-slate-700 font-medium">
-                Normalized GPA (4.0 Scale): <span className="font-extrabold text-royal font-mono text-sm">{matchResult.normalizedGpa4Scale}</span>
+            <div className="space-y-6">
+              {/* Category Filter Tabs */}
+              <div className="flex flex-wrap items-center justify-between gap-4 glass-panel p-2.5 rounded-2xl border border-slate-200 shadow-md">
+                <div className="flex items-center gap-1.5">
+                  {(['ALL', 'QUALIFIED', 'REACH', 'SAFETY'] as const).map((tab) => {
+                    const count =
+                      tab === 'ALL'
+                        ? matchResult.matches.length
+                        : matchResult.matches.filter((m: any) => m.qualificationStatus === tab).length;
+                    const isActive = activeTab === tab;
+
+                    return (
+                      <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                          isActive
+                            ? 'bg-gradient-to-r from-blue-600 to-royal text-white shadow-md'
+                            : 'text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span>{tab}</span>
+                        <span
+                          className={`px-1.5 py-0.5 rounded-full text-[10px] ${
+                            isActive ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <span className="text-xs text-slate-500 font-mono pr-2">
+                  Total Matches: <strong className="text-slate-navy">{matchResult.matches.length}</strong>
+                </span>
               </div>
-              <div className="text-xs text-slate-500 font-mono">
-                Found <span className="text-slate-navy font-bold">{matchResult.matches.length}</span> Program Matches
+
+              {/* Matched Program Cards */}
+              <div className="space-y-6">
+                <AnimatePresence mode="popLayout">
+                  {filteredMatches.map((m: any, idx: number) => {
+                    const statusColors = {
+                      QUALIFIED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                      REACH: 'bg-amber-50 text-amber-700 border-amber-200',
+                      SAFETY: 'bg-blue-50 text-royal border-blue-200',
+                    };
+
+                    return (
+                      <motion.div
+                        key={m.programId || idx}
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -15 }}
+                        transition={{ duration: 0.2, delay: idx * 0.05 }}
+                        className="glass-panel p-6 rounded-3xl border border-slate-200 shadow-xl space-y-4 hover:border-royal transition-all"
+                      >
+                        {/* Program Card Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800">
+                                {m.countryName || m.countryIsoCode}
+                              </span>
+                              <span
+                                className={`text-xs font-mono font-extrabold px-3 py-0.5 rounded-full border ${
+                                  statusColors[m.qualificationStatus as keyof typeof statusColors] ||
+                                  'bg-slate-100 text-slate-800'
+                                }`}
+                              >
+                                {m.qualificationStatus}
+                              </span>
+                            </div>
+                            <h3 className="text-xl font-bold font-outfit text-slate-navy">{m.programTitle}</h3>
+                            <div className="flex items-center gap-2 mt-1">
+                              <p className="text-xs font-semibold text-royal">{m.universityName}</p>
+                              <a
+                                href={formatOfficialUrl(m.officialWebsiteUrl, m.domain, m.universityName)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] text-royal hover:underline font-semibold bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200"
+                                title={`Visit official portal for ${m.universityName}`}
+                              >
+                                <span>Official Portal</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          </div>
+
+                          <div className="text-left sm:text-right font-mono">
+                            <span className="block text-[10px] text-slate-400 uppercase font-bold">Match Score</span>
+                            <span className="text-2xl font-extrabold gradient-text-royal">
+                              {m.matchScore}%
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Fit Criteria Indicators */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200 font-mono">
+                          <div>
+                            <span className="block text-slate-400 text-[10px]">Academic Fit</span>
+                            <span className="font-bold text-slate-800">{m.gpaFit || '100%'}</span>
+                          </div>
+                          <div>
+                            <span className="block text-slate-400 text-[10px]">Language Fit</span>
+                            <span className="font-bold text-slate-800">{m.languageFit || 'Pass'}</span>
+                          </div>
+                          <div>
+                            <span className="block text-slate-400 text-[10px]">Min GPA Req</span>
+                            <span className="font-bold text-royal">{m.minGpaReq ? `${m.minGpaReq} / 4.0` : 'None'}</span>
+                          </div>
+                          <div>
+                            <span className="block text-slate-400 text-[10px]">Scholarship Scope</span>
+                            <span className="font-bold text-amber-700">{m.scholarships?.length || 1} Rule(s) Joined</span>
+                          </div>
+                        </div>
+
+                        {/* Joined Scholarship Rules */}
+                        {m.scholarships && m.scholarships.length > 0 && (
+                          <div className="space-y-2 pt-2">
+                            <h4 className="text-xs font-bold font-mono text-slate-500 uppercase flex items-center gap-1.5">
+                              <Award className="w-4 h-4 text-amber-600" /> Applicable Multi-Scoped Funding Rules
+                            </h4>
+                            <div className="space-y-2">
+                              {m.scholarships.map((rule: any, rIdx: number) => (
+                                <div
+                                  key={rule.ruleId || rIdx}
+                                  className="p-3.5 bg-amber-50/60 border border-amber-200/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                                >
+                                  <div>
+                                    <div className="flex items-center gap-2 mb-0.5">
+                                      <span className="px-2 py-0.5 rounded bg-amber-200/80 text-amber-900 text-[10px] font-mono font-bold uppercase">
+                                        {rule.scope || 'UNIVERSITY'} SCOPE
+                                      </span>
+                                      <ConfidenceBadge confidence={rule.confidenceTier || 'VERIFIED'} />
+                                    </div>
+                                    <span className="font-bold text-amber-950 block">{rule.title}</span>
+                                    <p className="text-[11px] text-amber-800 leading-relaxed mt-0.5">
+                                      {rule.description || 'Provides partial or full tuition waiver based on merit.'}
+                                    </p>
+                                  </div>
+                                  <div className="shrink-0 font-mono text-right flex flex-col sm:items-end gap-1">
+                                    <span className="block text-xs font-extrabold text-amber-900">
+                                      {rule.coveragePercentage ? `${rule.coveragePercentage}% Waiver` : 'Full Aid'}
+                                    </span>
+                                    <a
+                                      href={formatOfficialUrl(rule.sourceUrl, m.domain, `${rule.title} official rule`)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 hover:text-amber-950 hover:underline bg-amber-200/60 px-2 py-0.5 rounded"
+                                    >
+                                      <span>Official Rule Source</span>
+                                      <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+
+                {filteredMatches.length === 0 && (
+                  <div className="py-12 text-center glass-panel rounded-3xl border border-slate-200 p-8">
+                    <BookOpen className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                    <h4 className="text-sm font-bold text-slate-700">No matches found for "{activeTab}" filter</h4>
+                    <p className="text-xs text-slate-500 mt-1">Try switching to the "ALL" tab or lowering your required threshold.</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
-
-          <AnimatePresence>
-            {matchResult?.matches.map((match, idx) => (
-              <motion.div
-                key={match.programId}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: idx * 0.1 }}
-                className="glass-panel p-6 rounded-3xl border border-slate-200 hover:border-royal transition-all relative overflow-hidden shadow-lg"
-              >
-                {/* Header Row */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">{match.countryName}</span>
-                      <span className="text-xs text-slate-500 font-medium">• {match.campusName}</span>
-                    </div>
-                    <h3 className="text-xl font-bold font-outfit text-slate-navy">{match.programTitle}</h3>
-                    <p className="text-sm text-royal font-semibold">{match.universityName}</p>
-                  </div>
-
-                  {/* Fit Score & Status Badge */}
-                  <div className="flex sm:flex-col items-end justify-between gap-2 shrink-0">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-extrabold tracking-wider uppercase shadow-sm ${
-                        match.qualificationStatus === 'QUALIFIED'
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                          : match.qualificationStatus === 'SAFETY'
-                          ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                          : 'bg-amber-100 text-amber-800 border border-amber-300'
-                      }`}
-                    >
-                      {match.qualificationStatus}
-                    </span>
-                    <div className="text-right">
-                      <span className="text-xs text-slate-500 block font-mono font-bold">Match Fit Score</span>
-                      <span className="text-2xl font-black font-outfit text-royal gradient-text-royal">{match.matchFitScorePct}%</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Requirements Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200 mb-4 text-xs">
-                  <div>
-                    <span className="text-slate-500 block text-[10px] font-mono uppercase font-bold">Min GPA Required</span>
-                    <span className="font-bold text-slate-800">{match.requirements.minGpa} / 4.0</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px] font-mono uppercase font-bold">Min IELTS</span>
-                    <span className="font-bold text-slate-800">{match.requirements.minIelts || 'Not Required'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px] font-mono uppercase font-bold">Min GRE</span>
-                    <span className="font-bold text-slate-800">{match.requirements.minGre || 'Optional'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px] font-mono uppercase font-bold">Papers Required</span>
-                    <span className="font-bold text-slate-800">{match.requirements.requiresPapers ? 'Yes' : 'No'}</span>
-                  </div>
-                </div>
-
-                {/* Scholarship Offers Section */}
-                <div className="space-y-3">
-                  <h4 className="text-xs font-bold font-mono uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                    <Award className="w-4 h-4 text-amber-600" />
-                    Applicable Scholarship Scopes & Rules
-                  </h4>
-
-                  {match.scholarshipOffer.publishedRules.map((rule) => (
-                    <div key={rule.ruleId} className="p-4 rounded-2xl bg-white border border-slate-200 space-y-2 shadow-sm">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-slate-100 text-slate-700 border border-slate-200">
-                            Scope: {rule.scope}
-                          </span>
-                          <span className="text-sm font-bold text-slate-navy">{rule.title}</span>
-                        </div>
-                        <ConfidenceBadge confidence={rule.confidence} />
-                      </div>
-
-                      <p className="text-xs text-slate-600">{rule.description || 'Verified funding rule for qualified applicants.'}</p>
-
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                        <span className="text-slate-600 font-medium">Calculated Scholarship Waiver:</span>
-                        <span className="text-royal font-extrabold font-mono text-sm">{rule.calculatedPct}% Waiver</span>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Crowdsourced Distribution if present */}
-                  {match.scholarshipOffer.crowdsourcedDistribution && (
-                    <div className="p-4 rounded-2xl bg-sky-50/60 border border-sky-200 text-xs space-y-2 shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-sky-900 flex items-center gap-1.5">
-                          <Globe className="w-3.5 h-3.5 text-royal" />
-                          Student Self-Reported Admit Distribution
-                        </span>
-                        <ConfidenceBadge confidence="CROWDSOURCED" />
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-center pt-1 font-mono">
-                        <div className="bg-white p-2 rounded-lg border border-slate-200">
-                          <span className="block text-[10px] text-slate-500 font-bold">25th Percentile</span>
-                          <span className="font-bold text-slate-900">{match.scholarshipOffer.crowdsourcedDistribution.p25ScholarshipPct}%</span>
-                        </div>
-                        <div className="bg-white p-2 rounded-lg border border-blue-300 shadow-sm">
-                          <span className="block text-[10px] text-royal font-bold">Median Yield</span>
-                          <span className="font-extrabold text-royal">{match.scholarshipOffer.crowdsourcedDistribution.medianScholarshipPct}%</span>
-                        </div>
-                        <div className="bg-white p-2 rounded-lg border border-slate-200">
-                          <span className="block text-[10px] text-slate-500 font-bold">75th Percentile</span>
-                          <span className="font-bold text-slate-900">{match.scholarshipOffer.crowdsourcedDistribution.p75ScholarshipPct}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
         </div>
       </div>
     </div>
@@ -370,7 +441,7 @@ function MatchContent() {
 
 export default function MatchPage() {
   return (
-    <Suspense fallback={<div className="p-12 text-center text-slate-500 font-mono">Loading Match Engine...</div>}>
+    <Suspense fallback={<div className="p-10 text-center font-mono text-xs text-slate-500">Loading Eligibility Engine...</div>}>
       <MatchContent />
     </Suspense>
   );

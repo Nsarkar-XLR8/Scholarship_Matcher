@@ -3,6 +3,7 @@ import '../styles/globals.css';
 import Navbar from '@/components/common/Navbar';
 import Footer from '@/components/common/Footer';
 import SmoothScrollProvider from '@/components/common/SmoothScrollProvider';
+import { ToastProvider } from '@/components/common/ToastProvider';
 
 export const metadata: Metadata = {
   title: 'Global Masters Scholarship Matcher | Data-Honest Funding Engine',
@@ -18,11 +19,13 @@ export default function RootLayout({
   return (
     <html lang="en" data-scroll-behavior="smooth">
       <body className="bg-porcelain text-slate-navy antialiased selection:bg-royal selection:text-white min-h-screen flex flex-col">
-        <SmoothScrollProvider>
-          <Navbar />
-          <main className="flex-grow">{children}</main>
-          <Footer />
-        </SmoothScrollProvider>
+        <ToastProvider>
+          <SmoothScrollProvider>
+            <Navbar />
+            <main className="flex-grow">{children}</main>
+            <Footer />
+          </SmoothScrollProvider>
+        </ToastProvider>
       </body>
     </html>
   );
