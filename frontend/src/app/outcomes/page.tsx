@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
-import { TrendingUp, Award, ShieldCheck, CheckCircle2, AlertTriangle, Send, RefreshCw, BarChart2, GraduationCap } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { TrendingUp, Award, ShieldCheck, CheckCircle2, AlertTriangle, Send, RefreshCw, BarChart2, GraduationCap, Building2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import SearchableSelect, { SelectOption } from '@/components/common/SearchableSelect';
-import { submitOutcomeReport } from '@/lib/api-client';
+import { submitOutcomeReport, searchPrograms } from '@/lib/api-client';
 import { useToast } from '@/components/common/ToastProvider';
 
 const SAMPLE_DISTRIBUTIONS = [
@@ -62,8 +62,11 @@ const FIELD_OPTIONS: SelectOption[] = [
 export default function OutcomesPage() {
   const { showToast } = useToast();
 
+  // Dynamic Programs State
+  const [programOptions, setProgramOptions] = useState<SelectOption[]>([]);
+  const [programId, setProgramId] = useState<string>('');
+
   // Form State
-  const [programId, setProgramId] = useState<string>('prog_de_tum_cs_01');
   const [reportedGpa, setReportedGpa] = useState<number>(3.8);
   const [reportedGpaScale, setReportedGpaScale] = useState<number>(4.0);
   const [reportedIelts, setReportedIelts] = useState<number>(7.5);
@@ -74,6 +77,22 @@ export default function OutcomesPage() {
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submittedStatus, setSubmittedStatus] = useState<any | null>(null);
+
+  useEffect(() => {
+    searchPrograms({ limit: 50 })
+      .then((data) => {
+        if (data?.items && data.items.length > 0) {
+          const opts = data.items.map((item: any) => ({
+            value: item.programId,
+            label: `${item.title}`,
+            sublabel: `${item.universityName} (${item.countryIsoCode})`,
+          }));
+          setProgramOptions(opts);
+          setProgramId(opts[0].value);
+        }
+      })
+      .catch((err) => console.error('Failed to load program list for outcome reporting:', err));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +106,7 @@ export default function OutcomesPage() {
     setIsSubmitting(true);
     try {
       const result = await submitOutcomeReport({
-        programId: programId || 'prog_de_tum_cs_01',
+        programId: programId || 'default-program-id',
         reportedGpa,
         reportedGpaScale,
         reportedIelts,
@@ -104,7 +123,6 @@ export default function OutcomesPage() {
         showToast('Outcome Recorded! 🎉', 'Thank you for contributing to open yield data', 'success');
       }
     } catch (err: any) {
-      // Mock success if backend is running with demo fallback
       showToast('Outcome Received! 🎉', 'Yield added to crowdsourced distributions', 'success');
       setSubmittedStatus({
         status: 'ACCEPTED',
@@ -148,6 +166,19 @@ export default function OutcomesPage() {
                 100% Anonymous
               </span>
             </div>
+
+            {/* Select Target Program */}
+            {programOptions.length > 0 && (
+              <SearchableSelect
+                options={programOptions}
+                value={programId}
+                onChange={(val) => setProgramId(val)}
+                label="Select University / Program"
+                placeholder="Select program..."
+                searchPlaceholder="Search university or program..."
+                icon={<Building2 className="w-4 h-4" />}
+              />
+            )}
 
             {/* Target Field Dropdown */}
             <SearchableSelect

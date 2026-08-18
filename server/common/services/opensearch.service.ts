@@ -71,6 +71,17 @@ export class OpenSearchService implements OnModuleInit {
     }
   }
 
+  async bulkIndexProgramDocuments(docs: Record<string, any>[]): Promise<void> {
+    if (!this.client || !docs || docs.length === 0) return;
+    try {
+      const body = docs.flatMap((doc) => [{ index: { _index: this.indexName, _id: doc.programId } }, doc]);
+      await this.client.bulk({ refresh: true, body });
+      this.logger.log(`Bulk indexed ${docs.length} program documents into OpenSearch.`);
+    } catch (error) {
+      this.logger.error('OpenSearch bulk indexing error:', error.message);
+    }
+  }
+
   async searchPrograms(queryText?: string, filters?: any): Promise<any[] | null> {
     if (!this.client) return null; // Fallback signal
     try {
@@ -89,8 +100,15 @@ export class OpenSearchService implements OnModuleInit {
         mustClauses.push({ term: { countryIsoCode: filters.countryIsoCode } });
       }
 
-      if (filters?.fieldOfStudy) {
-        mustClauses.push({ term: { fieldOfStudy: filters.fieldOfStudy } });
+      if (filters?.fieldOfStudy && filters.fieldOfStudy.trim().length > 0) {
+        mustClauses.push({
+          match: {
+            fieldOfStudy: {
+              query: filters.fieldOfStudy,
+              operator: 'or',
+            },
+          },
+        });
       }
 
       if (filters?.maxGpaRequirement) {

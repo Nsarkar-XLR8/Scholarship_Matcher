@@ -59,7 +59,9 @@ export class MatchingService {
     const programs = await this.prisma.program.findMany({
       where: {
         isActive: true,
-        fieldOfStudy: { contains: dto.targetField, mode: 'insensitive' },
+        ...(dto.targetField && dto.targetField.trim().length > 0 && dto.targetField.toUpperCase() !== 'ALL'
+          ? { fieldOfStudy: { contains: dto.targetField, mode: 'insensitive' } }
+          : {}),
         ...(dto.preferredCountryIsoCodes?.length
           ? { campus: { country: { isoCode: { in: dto.preferredCountryIsoCodes.map((c) => c.toUpperCase()) } } } }
           : {}),

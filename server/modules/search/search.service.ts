@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../common/services/prisma.service';
 import { RedisService } from '../../common/services/redis.service';
 import { OpenSearchService } from '../../common/services/opensearch.service';
 import { SearchRequestDto } from './dto/search-request.dto';
 
 @Injectable()
-export class SearchService {
+export class SearchService implements OnModuleInit {
   private readonly logger = new Logger(SearchService.name);
 
   constructor(
@@ -13,6 +13,48 @@ export class SearchService {
     private readonly redis: RedisService,
     private readonly openSearch: OpenSearchService
   ) {}
+
+  async onModuleInit() {
+    await this.syncAllProgramsToOpenSearch();
+  }
+
+  async syncAllProgramsToOpenSearch() {
+    try {
+      const programs = await this.prisma.program.findMany({
+        where: { isActive: true },
+        include: {
+          university: { select: { id: true, name: true, domain: true } },
+          campus: { include: { country: true } },
+          requirements: { where: { validTo: null } },
+          scholarshipRules: true,
+        },
+      });
+
+      const docs = programs.map((p) => ({
+        programId: p.id,
+        title: p.title,
+        fieldOfStudy: p.fieldOfStudy,
+        degreeLevel: p.degreeLevel,
+        universityId: p.university.id,
+        universityName: p.university.name,
+        domain: p.university.domain,
+        officialWebsiteUrl: p.university.domain ? `https://${p.university.domain.replace(/^https?:\/\//i, '')}` : null,
+        sourceUrl: p.sourceUrl,
+        countryIsoCode: p.campus.country.isoCode,
+        countryName: p.campus.country.name,
+        minGpa: p.requirements[0]?.minGpa || 0.0,
+        minIelts: p.requirements[0]?.minIelts || null,
+        minGre: p.requirements[0]?.minGre || null,
+        tuitionFeeLocal: p.tuitionFeeLocal,
+        currencyCode: p.currencyCode,
+        scholarshipRulesCount: p.scholarshipRules.length,
+      }));
+
+      await this.openSearch.bulkIndexProgramDocuments(docs);
+    } catch (err) {
+      this.logger.warn('Failed to auto-sync programs to OpenSearch:', err.message);
+    }
+  }
 
   async searchPrograms(dto: SearchRequestDto) {
     const cacheKey = `search:${JSON.stringify(dto)}`;

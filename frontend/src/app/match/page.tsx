@@ -10,6 +10,7 @@ import { evaluateProfileMatch, MatchResult } from '@/lib/api-client';
 import { formatOfficialUrl } from '@/lib/url-formatter.util';
 
 const FIELD_OPTIONS: SelectOption[] = [
+  { value: '', label: 'All Fields of Study', icon: '🎓' },
   { value: 'Computer Science', label: 'Computer Science', sublabel: 'STEM / Technology' },
   { value: 'Data Science & AI', label: 'Data Science & Artificial Intelligence', sublabel: 'STEM / Analytics' },
   { value: 'Electrical Engineering', label: 'Electrical Engineering', sublabel: 'Engineering' },
@@ -28,7 +29,7 @@ function MatchContent() {
   const [ielts, setIelts] = useState<number | undefined>(7.0);
   const [gre, setGre] = useState<number | undefined>(320);
   const [papersCount, setPapersCount] = useState<number>(1);
-  const [targetField, setTargetField] = useState<string>(searchParams.get('field') || 'Computer Science');
+  const [targetField, setTargetField] = useState<string>(searchParams.get('field') || '');
   const [preferredCountries, setPreferredCountries] = useState<string[]>(['DE', 'NL', 'GB', 'US', 'MY']);
 
   // Match Filter Tab State
@@ -50,7 +51,7 @@ function MatchContent() {
         ielts,
         gre,
         papersCount,
-        targetField: targetField || 'Computer Science',
+        targetField,
         preferredCountryIsoCodes: preferredCountries.length > 0 ? preferredCountries : ['DE', 'NL', 'GB', 'US', 'MY'],
       });
 

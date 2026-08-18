@@ -40,9 +40,10 @@ export class MatchRequestDto {
   @Min(0)
   papersCount?: number = 0;
 
-  @ApiProperty({ example: 'Computer Science', description: 'Target field of study' })
+  @ApiProperty({ example: 'Computer Science', description: 'Target field of study (or empty for all fields)', required: false })
   @IsString()
-  targetField: string;
+  @IsOptional()
+  targetField?: string;
 
   @ApiProperty({ enum: DegreeLevel, default: DegreeLevel.MS })
   @IsEnum(DegreeLevel)
