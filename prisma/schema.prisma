@@ -112,25 +112,31 @@ enum DegreeLevel {
 }
 
 model Program {
-  id             String               @id @default(uuid())
-  universityId   String
-  university     University           @relation(fields: [universityId], references: [id], onDelete: Cascade)
-  campusId       String
-  campus         Campus               @relation(fields: [campusId], references: [id], onDelete: Cascade)
-  title          String               // e.g. "M.Sc. Computer Science"
-  degreeLevel    DegreeLevel          @default(MS)
-  fieldOfStudy   String               // e.g. "Computer Science", "Data Science"
-  durationMonths Int                  @default(24)
-  language       String               @default("English")
-  tuitionFeeLocal Float               @default(0.0)
-  currencyCode   String               @default("EUR")
-  sourceUrl      String
-  isActive       Boolean              @default(true)
+  id                     String               @id @default(uuid())
+  universityId           String
+  university             University           @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  campusId               String
+  campus                 Campus               @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  title                  String               // e.g. "M.Sc. Computer Science"
+  degreeLevel            DegreeLevel          @default(MS)
+  fieldOfStudy           String               // e.g. "Computer Science", "Data Science"
+  durationMonths         Int                  @default(24)
+  language               String               @default("English")
+  tuitionFeeLocal        Float                @default(0.0)
+  currencyCode           String               @default("EUR")
+  sourceUrl              String
+  officialSourceUrl      String?
+  officialSourceProvider String?              @default("OFFICIAL_UNIVERSITY_PORTAL") // e.g. "DAAD Germany", "TU Munich Official Page", "StudyInNL"
+  applicationDeadline    DateTime?
+  intakeSeason           String?              // e.g. "Winter 2026", "Fall 2026"
+  feeWaiverAvailable     Boolean              @default(false)
+  lastVerifiedAt         DateTime             @default(now())
+  isActive               Boolean              @default(true)
 
-  requirements   ProgramRequirement[]
-  scholarshipRules ScholarshipRule[]  // Program-specific scholarships
-  outcomeReports OutcomeReport[]
-  auditLogs      RequirementAuditLog[]
+  requirements           ProgramRequirement[]
+  scholarshipRules       ScholarshipRule[]  // Program-specific scholarships
+  outcomeReports         OutcomeReport[]
+  auditLogs              RequirementAuditLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -147,21 +153,26 @@ enum ConfidenceLevel {
 }
 
 model ProgramRequirement {
-  id              String          @id @default(uuid())
-  programId       String
-  program         Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
-  minGpa          Float           @default(0.0) // Normalized to 4.0 scale
-  minGpaOriginal  Float           @default(0.0)
-  gpaScale        Float           @default(4.0)
-  minIelts        Float?
-  minToefl        Int?
-  minGre          Int?
-  requiresPapers  Boolean         @default(false)
-  minPapersCount  Int             @default(0)
-  sourceUrl       String
-  confidence      ConfidenceLevel @default(VERIFIED)
-  validFrom       DateTime        @default(now())
-  validTo         DateTime?       // NULL indicates current active requirement
+  id                   String          @id @default(uuid())
+  programId            String
+  program              Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  minGpa               Float           @default(0.0) // Normalized to 4.0 scale
+  minGpaOriginal       Float           @default(0.0)
+  gpaScale             Float           @default(4.0)
+  gpaScaleName         String          @default("US 4.0") // e.g. "US 4.0", "German Inverse 1.0-4.0", "UK Honours", "Indian 10.0 CGPA"
+  minIelts             Float?
+  minToefl             Int?
+  minDuolingo          Int?
+  minPte               Int?
+  minGre               Int?
+  minGmat              Int?
+  workExpYearsRequired Int             @default(0)
+  requiresPapers       Boolean         @default(false)
+  minPapersCount       Int             @default(0)
+  sourceUrl            String
+  confidence           ConfidenceLevel @default(VERIFIED)
+  validFrom            DateTime        @default(now())
+  validTo              DateTime?       // NULL indicates current active requirement
 
   createdAt DateTime @default(now())
 
@@ -195,30 +206,38 @@ enum CoverageType {
 }
 
 model ScholarshipRule {
-  id             String           @id @default(uuid())
-  title          String
-  scope          ScholarshipScope @default(UNIVERSITY)
-  type           ScholarshipType  @default(HOLISTIC)
-  coverageType   CoverageType     @default(PARTIAL_PERCENT)
+  id                         String           @id @default(uuid())
+  title                      String
+  scope                      ScholarshipScope @default(UNIVERSITY)
+  type                       ScholarshipType  @default(HOLISTIC)
+  coverageType               CoverageType     @default(PARTIAL_PERCENT)
 
-  programId      String?
-  program        Program?         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  programId                  String?
+  program                    Program?         @relation(fields: [programId], references: [id], onDelete: Cascade)
 
-  universityId   String?
-  university     University?      @relation(fields: [universityId], references: [id], onDelete: Cascade)
+  universityId               String?
+  university                 University?      @relation(fields: [universityId], references: [id], onDelete: Cascade)
 
-  countryId      String?
-  country        Country?         @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  countryId                  String?
+  country                    Country?         @relation(fields: [countryId], references: [id], onDelete: Cascade)
 
-  fundingPctMin  Float            @default(0.0)
-  fundingPctMax  Float            @default(100.0)
-  fixedAmountUsd Float?
+  fundingPctMin              Float            @default(0.0)
+  fundingPctMax              Float            @default(100.0)
+  fixedAmountUsd             Float?
+  maxGrantAmountUsd          Float?
+  eligibleNationalities      String[]         @default([]) // List of ISO 3166-1 country codes allowed; empty = open globally
+  requiresSeparateApplication Boolean         @default(false)
+  applicationDeadline        DateTime?
 
   // Store JSON criteria e.g. [{"minGpa": 3.5, "fundingPct": 50.0}, {"minGpa": 3.8, "fundingPct": 100.0}]
-  tierCriteriaJson Json?
-  description    String?          @db.Text
-  sourceUrl      String
-  confidence     ConfidenceLevel  @default(VERIFIED)
+  tierCriteriaJson           Json?
+  description                String?          @db.Text
+  sourceUrl                  String
+  officialSourceUrl          String?
+  officialSourceProvider     String?          @default("OFFICIAL_GOVERNMENT_PORTAL") // e.g., "DAAD EPOS Portal", "Chevening Secretariat"
+  confidence                 ConfidenceLevel  @default(VERIFIED)
+
+  criteriaList               ScholarshipEligibilityCriteria[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -226,6 +245,23 @@ model ScholarshipRule {
   @@index([scope, countryId])
   @@index([universityId])
   @@index([programId])
+}
+
+model ScholarshipEligibilityCriteria {
+  id                String          @id @default(uuid())
+  scholarshipRuleId String
+  scholarshipRule   ScholarshipRule @relation(fields: [scholarshipRuleId], references: [id], onDelete: Cascade)
+  minGpa            Float           @default(0.0)
+  minIelts          Float?
+  minToefl          Int?
+  minDuolingo       Int?
+  minPte            Int?
+  fundingPct        Float           @default(0.0)
+  description       String?
+
+  createdAt DateTime @default(now())
+
+  @@index([scholarshipRuleId])
 }
 
 // ==========================================

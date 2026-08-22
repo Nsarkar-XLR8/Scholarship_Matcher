@@ -3,6 +3,7 @@ import { PrismaService } from '../../common/services/prisma.service';
 import { RedisService } from '../../common/services/redis.service';
 import { MatchRequestDto } from './dto/match-request.dto';
 import { normalizeGpaToFourPoint } from '../../common/utils/gpa-converter.util';
+import { getScoreRequirementsBreakdown, TestScoreRequirementsBreakdown, toeflToIelts, duolingoToIelts, pteToIelts } from '../../common/utils/language-test-converter.util';
 
 export interface MatchResultItem {
   programId: string;
@@ -12,6 +13,10 @@ export interface MatchResultItem {
   domain: string;
   officialWebsiteUrl?: string | null;
   sourceUrl?: string | null;
+  officialSourceUrl?: string | null;
+  officialSourceProvider?: string | null;
+  applicationDeadline?: Date | null;
+  intakeSeason?: string | null;
   campusName: string;
   countryName: string;
   countryIsoCode: string;
@@ -20,8 +25,14 @@ export interface MatchResultItem {
   requirements: {
     minGpa: number;
     minIelts: number | null;
+    minToefl: number | null;
+    minDuolingo: number | null;
+    minPte: number | null;
     minGre: number | null;
+    minGmat: number | null;
+    workExpYearsRequired: number;
     requiresPapers: boolean;
+    scoreBreakdown: TestScoreRequirementsBreakdown;
   };
   scholarshipOffer: {
     publishedRules: Array<{
@@ -33,6 +44,8 @@ export interface MatchResultItem {
       confidence: string;
       description: string | null;
       sourceUrl: string;
+      officialSourceUrl: string | null;
+      officialSourceProvider: string | null;
     }>;
     crowdsourcedDistribution: {
       reportCount: number;
@@ -54,6 +67,12 @@ export class MatchingService {
 
   async evaluateStudentProfile(dto: MatchRequestDto): Promise<{ normalizedGpa4Scale: number; matches: MatchResultItem[] }> {
     const normalizedGpa = normalizeGpaToFourPoint(dto.gpa, dto.gpaScale || 4.0);
+
+    // Standardize student's English proficiency score to equivalent IELTS band
+    let effectiveStudentIelts = dto.ielts || null;
+    if (!effectiveStudentIelts && dto.toefl) {
+      effectiveStudentIelts = toeflToIelts(dto.toefl);
+    }
 
     // 1. Fetch candidate programs matching field & active requirement versioning
     const programs = await this.prisma.program.findMany({
@@ -93,13 +112,20 @@ export class MatchingService {
       const reqMinGpa = activeReq.minGpa;
       const gpaDiff = normalizedGpa - reqMinGpa;
 
-      const meetsGpa = gpaDiff >= -0.2; // Allow small tolerance for REACH evaluation
-      const meetsIelts = !activeReq.minIelts || !dto.ielts || dto.ielts >= activeReq.minIelts;
-      const meetsToefl = !activeReq.minToefl || !dto.toefl || dto.toefl >= activeReq.minToefl;
+      const meetsGpa = gpaDiff >= -0.2; // Allow tolerance for REACH status
+
+      // Language score cross-evaluation (IELTS, TOEFL, Duolingo, PTE)
+      let meetsLanguage = true;
+      if (activeReq.minIelts && effectiveStudentIelts) {
+        meetsLanguage = effectiveStudentIelts >= activeReq.minIelts;
+      } else if (activeReq.minToefl && dto.toefl) {
+        meetsLanguage = dto.toefl >= activeReq.minToefl;
+      }
+
       const meetsGre = !activeReq.minGre || !dto.gre || dto.gre >= activeReq.minGre;
       const meetsPapers = !activeReq.requiresPapers || (dto.papersCount || 0) >= activeReq.minPapersCount;
 
-      if (!meetsGpa || (!meetsIelts && !meetsToefl)) {
+      if (!meetsGpa || !meetsLanguage) {
         continue; // Exclude severely unqualified programs
       }
 
@@ -119,7 +145,6 @@ export class MatchingService {
       fitScore = Math.min(99, Math.max(40, fitScore));
 
       // 3. Multi-Scoped Scholarship Scope Resolution
-      // Fetch Program-scope, University-scope, Country-scope, and Global-scope scholarship rules
       const countryScholarships = await this.prisma.scholarshipRule.findMany({
         where: {
           countryId: program.campus.countryId,
@@ -154,6 +179,7 @@ export class MatchingService {
           }
         }
 
+        const rAny = rule as any;
         return {
           ruleId: rule.id,
           title: rule.title,
@@ -163,6 +189,8 @@ export class MatchingService {
           confidence: rule.confidence,
           description: rule.description,
           sourceUrl: rule.sourceUrl,
+          officialSourceUrl: rAny.officialSourceUrl || rule.sourceUrl,
+          officialSourceProvider: rAny.officialSourceProvider || 'OFFICIAL_GOVERNMENT_PORTAL',
         };
       });
 
@@ -179,14 +207,38 @@ export class MatchingService {
         };
       }
 
+      const reqAny = activeReq as any;
+      // Generate human-readable complete score requirements breakdown
+      const scoreBreakdown = getScoreRequirementsBreakdown({
+        minGpa: activeReq.minGpa,
+        minGpaOriginal: activeReq.minGpaOriginal,
+        gpaScaleName: reqAny.gpaScaleName,
+        minIelts: activeReq.minIelts,
+        minToefl: activeReq.minToefl,
+        minDuolingo: reqAny.minDuolingo,
+        minPte: reqAny.minPte,
+        minGre: activeReq.minGre,
+        minGmat: reqAny.minGmat,
+        workExpYearsRequired: reqAny.workExpYearsRequired,
+        minPapersCount: activeReq.minPapersCount,
+      });
+
+      const progAny = program as any;
+      const officialWebsiteUrl = progAny.officialSourceUrl
+        || (program.university.domain ? `https://${program.university.domain.replace(/^https?:\/\//i, '')}` : null);
+
       matches.push({
         programId: program.id,
         programTitle: program.title,
         fieldOfStudy: program.fieldOfStudy,
         universityName: program.university.name,
         domain: program.university.domain,
-        officialWebsiteUrl: program.university.domain ? `https://${program.university.domain.replace(/^https?:\/\//i, '')}` : null,
+        officialWebsiteUrl,
         sourceUrl: program.sourceUrl,
+        officialSourceUrl: progAny.officialSourceUrl || officialWebsiteUrl,
+        officialSourceProvider: progAny.officialSourceProvider || 'OFFICIAL_UNIVERSITY_PORTAL',
+        applicationDeadline: progAny.applicationDeadline,
+        intakeSeason: progAny.intakeSeason,
         campusName: program.campus.name,
         countryName: program.campus.country.name,
         countryIsoCode: program.campus.country.isoCode,
@@ -195,8 +247,14 @@ export class MatchingService {
         requirements: {
           minGpa: activeReq.minGpa,
           minIelts: activeReq.minIelts,
+          minToefl: activeReq.minToefl,
+          minDuolingo: reqAny.minDuolingo || null,
+          minPte: reqAny.minPte || null,
           minGre: activeReq.minGre,
+          minGmat: reqAny.minGmat || null,
+          workExpYearsRequired: reqAny.workExpYearsRequired || 0,
           requiresPapers: activeReq.requiresPapers,
+          scoreBreakdown,
         },
         scholarshipOffer: {
           publishedRules: publishedRulesFormatted,

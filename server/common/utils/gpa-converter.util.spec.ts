@@ -8,9 +8,9 @@ describe('GPA Converter Utility', () => {
   });
 
   it('should normalize 10.0 scale (India CGPA) to 4.0 scale', () => {
-    expect(normalizeGpaToFourPoint(8.5, 10.0)).toBe(3.4);
+    expect(normalizeGpaToFourPoint(8.5, 10.0)).toBe(3.8);
     expect(normalizeGpaToFourPoint(10.0, 10.0)).toBe(4.0);
-    expect(normalizeGpaToFourPoint(7.0, 10.0)).toBe(2.8);
+    expect(normalizeGpaToFourPoint(7.0, 10.0)).toBe(3.0);
   });
 
   it('should normalize 5.0 scale to 4.0 scale', () => {
@@ -25,8 +25,14 @@ describe('GPA Converter Utility', () => {
   });
 
   it('should normalize German scale (1.0 = best, 4.0 = passing)', () => {
-    expect(normalizeGpaToFourPoint(1.0, 1.0)).toBe(4.0);
-    expect(normalizeGpaToFourPoint(2.5, 1.0)).toBe(2.5);
-    expect(normalizeGpaToFourPoint(4.0, 1.0)).toBe(1.0);
+    expect(normalizeGpaToFourPoint(1.0, 'GERMAN')).toBe(4.0);
+    expect(normalizeGpaToFourPoint(2.5, 'GERMAN')).toBe(2.5);
+    expect(normalizeGpaToFourPoint(4.0, 'GERMAN')).toBe(1.0);
+  });
+
+  it('should normalize UK Honours degree classifications', () => {
+    expect(normalizeGpaToFourPoint(75, 'UK_HONOURS')).toBe(4.0); // 1st Class
+    expect(normalizeGpaToFourPoint(65, 'UK_HONOURS')).toBe(3.4); // 2:1 Upper Second
+    expect(normalizeGpaToFourPoint(55, 'UK_HONOURS')).toBe(2.8); // 2:2 Lower Second
   });
 });

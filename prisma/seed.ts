@@ -291,7 +291,10 @@ async function main() {
       tuitionFeeLocal: 6000.0, // Non-EU fee per semester e.g. ~3000 EUR x 4
       currencyCode: 'EUR',
       sourceUrl: 'https://www.cit.tum.de/en/cit/studies/degree-programs/master-informatics/',
-    },
+      officialSourceUrl: 'https://www.cit.tum.de/en/cit/studies/degree-programs/master-informatics/',
+      officialSourceProvider: 'TUM Official Portal',
+      intakeSeason: 'Winter 2026',
+    } as any,
   });
 
   await prisma.programRequirement.create({
@@ -300,15 +303,19 @@ async function main() {
       minGpa: 3.2, // 4.0 scale equivalent
       minGpaOriginal: 2.5, // German scale where lower is better
       gpaScale: 4.0,
+      gpaScaleName: 'German Inverse 1.0-4.0 Scale',
       minIelts: 6.5,
       minToefl: 88,
+      minDuolingo: 110,
+      minPte: 58,
       minGre: 315,
+      workExpYearsRequired: 0,
       requiresPapers: false,
       minPapersCount: 0,
       sourceUrl: 'https://www.cit.tum.de/en/cit/studies/degree-programs/master-informatics/',
       confidence: ConfidenceLevel.VERIFIED,
       validFrom: new Date('2024-01-01'),
-    },
+    } as any,
   });
 
   // Tiered scholarship for TUM

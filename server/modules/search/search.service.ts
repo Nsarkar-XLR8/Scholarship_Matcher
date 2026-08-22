@@ -3,6 +3,7 @@ import { PrismaService } from '../../common/services/prisma.service';
 import { RedisService } from '../../common/services/redis.service';
 import { OpenSearchService } from '../../common/services/opensearch.service';
 import { SearchRequestDto } from './dto/search-request.dto';
+import { getScoreRequirementsBreakdown } from '../../common/utils/language-test-converter.util';
 
 @Injectable()
 export class SearchService implements OnModuleInit {
@@ -30,25 +31,56 @@ export class SearchService implements OnModuleInit {
         },
       });
 
-      const docs = programs.map((p) => ({
-        programId: p.id,
-        title: p.title,
-        fieldOfStudy: p.fieldOfStudy,
-        degreeLevel: p.degreeLevel,
-        universityId: p.university.id,
-        universityName: p.university.name,
-        domain: p.university.domain,
-        officialWebsiteUrl: p.university.domain ? `https://${p.university.domain.replace(/^https?:\/\//i, '')}` : null,
-        sourceUrl: p.sourceUrl,
-        countryIsoCode: p.campus.country.isoCode,
-        countryName: p.campus.country.name,
-        minGpa: p.requirements[0]?.minGpa || 0.0,
-        minIelts: p.requirements[0]?.minIelts || null,
-        minGre: p.requirements[0]?.minGre || null,
-        tuitionFeeLocal: p.tuitionFeeLocal,
-        currencyCode: p.currencyCode,
-        scholarshipRulesCount: p.scholarshipRules.length,
-      }));
+      const docs = programs.map((p) => {
+        const pAny = p as any;
+        const req = p.requirements[0];
+        const reqAny = req as any;
+        const scoreBreakdown = req ? getScoreRequirementsBreakdown({
+          minGpa: req.minGpa,
+          minGpaOriginal: req.minGpaOriginal,
+          gpaScaleName: reqAny?.gpaScaleName,
+          minIelts: req.minIelts,
+          minToefl: req.minToefl,
+          minDuolingo: reqAny?.minDuolingo,
+          minPte: reqAny?.minPte,
+          minGre: req.minGre,
+          minGmat: reqAny?.minGmat,
+          workExpYearsRequired: reqAny?.workExpYearsRequired,
+          minPapersCount: req.minPapersCount,
+        }) : null;
+
+        const officialWebsiteUrl = pAny.officialSourceUrl || (p.university.domain ? `https://${p.university.domain.replace(/^https?:\/\//i, '')}` : null);
+
+        return {
+          programId: p.id,
+          title: p.title,
+          fieldOfStudy: p.fieldOfStudy,
+          degreeLevel: p.degreeLevel,
+          universityId: p.university.id,
+          universityName: p.university.name,
+          domain: p.university.domain,
+          officialWebsiteUrl,
+          sourceUrl: p.sourceUrl,
+          officialSourceUrl: pAny.officialSourceUrl || officialWebsiteUrl,
+          officialSourceProvider: pAny.officialSourceProvider || 'OFFICIAL_UNIVERSITY_PORTAL',
+          applicationDeadline: pAny.applicationDeadline,
+          intakeSeason: pAny.intakeSeason,
+          countryIsoCode: p.campus.country.isoCode,
+          countryName: p.campus.country.name,
+          minGpa: req?.minGpa || 0.0,
+          minIelts: req?.minIelts || null,
+          minToefl: req?.minToefl || null,
+          minDuolingo: reqAny?.minDuolingo || null,
+          minPte: reqAny?.minPte || null,
+          minGre: req?.minGre || null,
+          minGmat: reqAny?.minGmat || null,
+          workExpYearsRequired: reqAny?.workExpYearsRequired || 0,
+          scoreBreakdownSummary: scoreBreakdown?.englishProficiency.summaryText || null,
+          tuitionFeeLocal: p.tuitionFeeLocal,
+          currencyCode: p.currencyCode,
+          scholarshipRulesCount: p.scholarshipRules.length,
+        };
+      });
 
       await this.openSearch.bulkIndexProgramDocuments(docs);
     } catch (err) {
@@ -127,25 +159,56 @@ export class SearchService implements OnModuleInit {
       total,
       limit: dto.limit,
       offset: dto.offset,
-      items: items.map((p) => ({
-        programId: p.id,
-        title: p.title,
-        fieldOfStudy: p.fieldOfStudy,
-        degreeLevel: p.degreeLevel,
-        universityId: p.university.id,
-        universityName: p.university.name,
-        countryIsoCode: p.campus.country.isoCode,
-        countryName: p.campus.country.name,
-        minGpa: p.requirements[0]?.minGpa || 0.0,
-        minIelts: p.requirements[0]?.minIelts || null,
-        minGre: p.requirements[0]?.minGre || null,
-        tuitionFeeLocal: p.tuitionFeeLocal,
-        currencyCode: p.currencyCode,
-        domain: p.university.domain,
-        officialWebsiteUrl: p.university.domain ? `https://${p.university.domain.replace(/^https?:\/\//i, '')}` : null,
-        sourceUrl: p.sourceUrl,
-        scholarshipRulesCount: p.scholarshipRules.length,
-      })),
+      items: items.map((p) => {
+        const pAny = p as any;
+        const req = p.requirements[0];
+        const reqAny = req as any;
+        const scoreBreakdown = req ? getScoreRequirementsBreakdown({
+          minGpa: req.minGpa,
+          minGpaOriginal: req.minGpaOriginal,
+          gpaScaleName: reqAny?.gpaScaleName,
+          minIelts: req.minIelts,
+          minToefl: req.minToefl,
+          minDuolingo: reqAny?.minDuolingo,
+          minPte: reqAny?.minPte,
+          minGre: req.minGre,
+          minGmat: reqAny?.minGmat,
+          workExpYearsRequired: reqAny?.workExpYearsRequired,
+          minPapersCount: req.minPapersCount,
+        }) : null;
+
+        const officialWebsiteUrl = pAny.officialSourceUrl || (p.university.domain ? `https://${p.university.domain.replace(/^https?:\/\//i, '')}` : null);
+
+        return {
+          programId: p.id,
+          title: p.title,
+          fieldOfStudy: p.fieldOfStudy,
+          degreeLevel: p.degreeLevel,
+          universityId: p.university.id,
+          universityName: p.university.name,
+          countryIsoCode: p.campus.country.isoCode,
+          countryName: p.campus.country.name,
+          minGpa: req?.minGpa || 0.0,
+          minIelts: req?.minIelts || null,
+          minToefl: req?.minToefl || null,
+          minDuolingo: reqAny?.minDuolingo || null,
+          minPte: reqAny?.minPte || null,
+          minGre: req?.minGre || null,
+          minGmat: reqAny?.minGmat || null,
+          workExpYearsRequired: reqAny?.workExpYearsRequired || 0,
+          scoreBreakdown,
+          tuitionFeeLocal: p.tuitionFeeLocal,
+          currencyCode: p.currencyCode,
+          domain: p.university.domain,
+          officialWebsiteUrl,
+          sourceUrl: p.sourceUrl,
+          officialSourceUrl: pAny.officialSourceUrl || officialWebsiteUrl,
+          officialSourceProvider: pAny.officialSourceProvider || 'OFFICIAL_UNIVERSITY_PORTAL',
+          applicationDeadline: pAny.applicationDeadline,
+          intakeSeason: pAny.intakeSeason,
+          scholarshipRulesCount: p.scholarshipRules.length,
+        };
+      }),
     };
 
     await this.redis.set(cacheKey, response, 1800);
