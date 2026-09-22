@@ -20,6 +20,16 @@ export class SearchService implements OnModuleInit {
   }
 
   async syncAllProgramsToOpenSearch() {
+    const lockKey = 'lock:opensearch_init_sync';
+    const isLocked = await this.redis.get<string>(lockKey);
+    if (isLocked) {
+      this.logger.log('OpenSearch initial sync already in progress or recently completed by another replica. Skipping.');
+      return;
+    }
+
+    // Acquire lock for 5 minutes (300 seconds)
+    await this.redis.set(lockKey, 'LOCKED', 300);
+
     try {
       const programs = await this.prisma.program.findMany({
         where: { isActive: true },
@@ -110,15 +120,33 @@ export class SearchService implements OnModuleInit {
       return response;
     }
 
-    // 2. Fallback to PostgreSQL Relational Engine
+    // 2. High-Precision PostgreSQL Relational Query Engine
     const where: any = { isActive: true };
 
     if (dto.query) {
-      where.OR = [
-        { title: { contains: dto.query, mode: 'insensitive' } },
-        { fieldOfStudy: { contains: dto.query, mode: 'insensitive' } },
-        { university: { name: { contains: dto.query, mode: 'insensitive' } } },
-      ];
+      const queryTrimmed = dto.query.trim();
+      const tokens = queryTrimmed.split(/\s+/).filter(Boolean);
+
+      if (tokens.length === 1) {
+        where.OR = [
+          { title: { contains: queryTrimmed, mode: 'insensitive' } },
+          { fieldOfStudy: { contains: queryTrimmed, mode: 'insensitive' } },
+          { university: { name: { contains: queryTrimmed, mode: 'insensitive' } } },
+          { campus: { country: { name: { contains: queryTrimmed, mode: 'insensitive' } } } },
+          { campus: { country: { isoCode: { equals: queryTrimmed.toUpperCase() } } } },
+        ];
+      } else {
+        // Multi-token AND search across fields
+        where.AND = tokens.map((token) => ({
+          OR: [
+            { title: { contains: token, mode: 'insensitive' } },
+            { fieldOfStudy: { contains: token, mode: 'insensitive' } },
+            { university: { name: { contains: token, mode: 'insensitive' } } },
+            { campus: { country: { name: { contains: token, mode: 'insensitive' } } } },
+            { campus: { country: { isoCode: { equals: token.toUpperCase() } } } },
+          ],
+        }));
+      }
     }
 
     if (dto.countryIsoCode) {
@@ -129,27 +157,60 @@ export class SearchService implements OnModuleInit {
       where.fieldOfStudy = { contains: dto.fieldOfStudy, mode: 'insensitive' };
     }
 
+    if (dto.degreeLevel) {
+      where.degreeLevel = dto.degreeLevel;
+    }
+
+    const requirementConditions: any = { validTo: null };
+    let hasReqFilter = false;
+
     if (dto.maxGpaRequirement) {
+      requirementConditions.minGpa = { lte: dto.maxGpaRequirement };
+      hasReqFilter = true;
+    }
+
+    if (dto.maxIeltsRequirement) {
+      requirementConditions.OR = [
+        { minIelts: null },
+        { minIelts: { lte: dto.maxIeltsRequirement } },
+      ];
+      hasReqFilter = true;
+    }
+
+    if (hasReqFilter) {
       where.requirements = {
-        some: {
-          validTo: null,
-          minGpa: { lte: dto.maxGpaRequirement },
-        },
+        some: requirementConditions,
       };
+    }
+
+    if (dto.hasVerifiedScholarshipOnly) {
+      where.scholarshipRules = {
+        some: {},
+      };
+    }
+
+    // Dynamic Ordering
+    let orderBy: any = { title: 'asc' };
+    if (dto.sortBy === 'tuition_asc') {
+      orderBy = { tuitionFeeLocal: 'asc' };
+    } else if (dto.sortBy === 'tuition_desc') {
+      orderBy = { tuitionFeeLocal: 'desc' };
+    } else if (dto.sortBy === 'title_asc') {
+      orderBy = { title: 'asc' };
     }
 
     const [items, total] = await Promise.all([
       this.prisma.program.findMany({
         where,
-        take: dto.limit || 20,
+        take: dto.limit || 50,
         skip: dto.offset || 0,
         include: {
-          university: { select: { id: true, name: true, domain: true } },
+          university: { select: { id: true, name: true, domain: true, rankingQs: true } },
           campus: { include: { country: true } },
           requirements: { where: { validTo: null } },
           scholarshipRules: true,
         },
-        orderBy: { title: 'asc' },
+        orderBy,
       }),
       this.prisma.program.count({ where }),
     ]);
@@ -181,11 +242,15 @@ export class SearchService implements OnModuleInit {
 
         return {
           programId: p.id,
+          id: p.id,
           title: p.title,
           fieldOfStudy: p.fieldOfStudy,
           degreeLevel: p.degreeLevel,
+          durationMonths: p.durationMonths,
+          language: p.language,
           universityId: p.university.id,
           universityName: p.university.name,
+          rankingQs: p.university.rankingQs,
           countryIsoCode: p.campus.country.isoCode,
           countryName: p.campus.country.name,
           minGpa: req?.minGpa || 0.0,
@@ -196,6 +261,16 @@ export class SearchService implements OnModuleInit {
           minGre: req?.minGre || null,
           minGmat: reqAny?.minGmat || null,
           workExpYearsRequired: reqAny?.workExpYearsRequired || 0,
+          requirements: {
+            minGpa: req?.minGpa || 0.0,
+            minIelts: req?.minIelts || null,
+            minToefl: req?.minToefl || null,
+            minDuolingo: reqAny?.minDuolingo || null,
+            minPte: reqAny?.minPte || null,
+            minGre: req?.minGre || null,
+            workExpYearsRequired: reqAny?.workExpYearsRequired || 0,
+            requiresPapers: req?.requiresPapers || false,
+          },
           scoreBreakdown,
           tuitionFeeLocal: p.tuitionFeeLocal,
           currencyCode: p.currencyCode,
@@ -207,6 +282,16 @@ export class SearchService implements OnModuleInit {
           applicationDeadline: pAny.applicationDeadline,
           intakeSeason: pAny.intakeSeason,
           scholarshipRulesCount: p.scholarshipRules.length,
+          scholarshipRules: p.scholarshipRules.map((r) => ({
+            id: r.id,
+            title: r.title,
+            scope: r.scope,
+            type: r.type,
+            coveragePct: r.fundingPctMax,
+            fundingPctMax: r.fundingPctMax,
+            fundingPctMin: r.fundingPctMin,
+            officialSourceUrl: (r as any).officialSourceUrl || null,
+          })),
         };
       }),
     };

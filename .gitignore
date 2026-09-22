@@ -1,36 +1,63 @@
-# Dependencies
+# ==========================================
+# DEPENDENCIES & PACKAGE MANAGERS
+# ==========================================
 node_modules/
-frontend/node_modules/
+*/node_modules/
 .pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
 
-# Build Outputs
+# ==========================================
+# BUILD OUTPUTS & COMPILATION ARTIFACTS
+# ==========================================
 dist/
+*/dist/
 build/
+*/build/
 .next/
 frontend/.next/
 out/
 frontend/out/
+.vercel/
 
-# Environment Variables & Secrets
+# ==========================================
+# ENVIRONMENT VARIABLES & SECRETS
+# ==========================================
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+frontend/.env
 frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
 *.pem
+*.key
+*.cert
+*.crt
 
-# IDE & OS Garbage
-.DS_Store
-.idea/
-.vscode/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# Keep example templates committed
+!.env.example
+!frontend/.env.example
 
-# Logs & Diagnostics
+# ==========================================
+# DATABASES & LOCAL STORAGE
+# ==========================================
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+pgdata/
+docker-data/
+
+# ==========================================
+# LOGS & DIAGNOSTICS
+# ==========================================
 logs/
 *.log
 npm-debug.log*
@@ -39,13 +66,54 @@ yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
 
-# Test Coverage
+# ==========================================
+# TEST COVERAGE & AUDIT REPORTS
+# ==========================================
 coverage/
+*/coverage/
 .nyc_output/
+test-results/
+playwright-report/
 
-# Temporary & Cache
+# ==========================================
+# CACHES & TYPESCRIPT BUILD INFO
+# ==========================================
 .cache/
+*/.cache/
 .turbo/
 frontend/.turbo/
-.tsbuildinfo
+*.tsbuildinfo
 dist/tsconfig.tsbuildinfo
+.eslintcache
+.stylelintcache
+
+# ==========================================
+# IDE & OPERATING SYSTEM JUNK
+# ==========================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+
+# Linux
+*~
+
+# IDEs
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.sublime-project
+*.sublime-workspace

@@ -93,6 +93,7 @@ describe('MatchingService', () => {
     });
 
     expect(result.normalizedGpa4Scale).toBe(3.6);
+    expect(result.effectiveGpa4Scale).toBe(3.6);
     expect(result.matches.length).toBe(1);
 
     const match = result.matches[0];
@@ -101,5 +102,25 @@ describe('MatchingService', () => {
     expect(match.scholarshipOffer.publishedRules.length).toBe(1);
     expect(match.scholarshipOffer.publishedRules[0].calculatedPct).toBe(50.0);
     expect(match.scholarshipOffer.crowdsourcedDistribution).toBeDefined();
+    expect(match.milestones).toBeDefined();
+  });
+
+  it('should apply holistic work experience compensation for working professionals', async () => {
+    const result = await service.evaluateStudentProfile({
+      gpa: 3.1,
+      gpaScale: 4.0,
+      ielts: 7.0,
+      workExpYears: 4,
+      workExpRelevance: 'DIRECT',
+      targetField: 'Computer Science',
+    });
+
+    expect(result.normalizedGpa4Scale).toBe(3.1);
+    // 4 years * 0.05 * 1.0 = +0.20 boost -> 3.30 effective GPA (meets 3.2 requirement)
+    expect(result.effectiveGpa4Scale).toBe(3.3);
+    expect(result.workExperienceCompensation.gpaBoost).toBe(0.2);
+    expect(result.matches.length).toBe(1);
+    expect(result.matches[0].qualificationStatus).toBe('QUALIFIED');
   });
 });
+

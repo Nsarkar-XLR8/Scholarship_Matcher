@@ -3,18 +3,19 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, Sparkles, Search, Layers, Columns3, Menu, X, GraduationCap, TrendingUp } from 'lucide-react';
+import { Compass, Sparkles, Search, Layers, Columns3, Menu, X, GraduationCap, TrendingUp, BookmarkCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useShortlist } from '@/context/ShortlistContext';
 
 export default function Navbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { shortlist, setIsComparisonOpen } = useShortlist();
 
   const navLinks = [
     { href: '/', label: 'Home', icon: Compass },
     { href: '/match', label: 'Match Fit Engine', icon: Sparkles },
     { href: '/search', label: 'Explore Programs', icon: Search },
-    { href: '/taxonomy', label: 'UN Geography', icon: Layers },
     { href: '/comparison', label: 'Country Matrix', icon: Columns3 },
     { href: '/outcomes', label: 'Yield Outcomes', icon: TrendingUp },
   ];
@@ -64,8 +65,19 @@ export default function Navbar() {
           })}
         </nav>
 
-        {/* CTA Button */}
-        <div className="hidden md:flex items-center gap-4">
+        {/* CTA & Shortlist Buttons */}
+        <div className="hidden md:flex items-center gap-3">
+          {shortlist.length > 0 && (
+            <button
+              onClick={() => setIsComparisonOpen(true)}
+              className="relative inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-blue-50 border border-blue-200 text-royal hover:bg-blue-100 font-bold text-xs shadow-sm transition-all"
+            >
+              <BookmarkCheck className="w-4 h-4 text-royal" />
+              <span>Compare ({shortlist.length})</span>
+              <span className="w-2 h-2 rounded-full bg-royal animate-pulse"></span>
+            </button>
+          )}
+
           <Link
             href="/match"
             className="group relative inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-blue-600 via-royal to-sky-glow text-white font-bold text-xs tracking-wide shadow-[0_4px_20px_rgba(37,99,235,0.35)] hover:shadow-[0_6px_25px_rgba(37,99,235,0.5)] hover:scale-105 transition-all"

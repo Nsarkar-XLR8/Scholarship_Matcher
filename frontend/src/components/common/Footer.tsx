@@ -59,7 +59,7 @@ export default function Footer() {
           <ul className="space-y-2 text-xs font-medium">
             <li><Link href="/match" className="hover:text-royal transition-colors">Match Fit Engine</Link></li>
             <li><Link href="/search" className="hover:text-royal transition-colors">Explore Programs</Link></li>
-            <li><Link href="/taxonomy" className="hover:text-royal transition-colors">UN M49 Geography</Link></li>
+            <li><Link href="/search?view=geography" className="hover:text-royal transition-colors">UN M49 Geography</Link></li>
             <li><Link href="/comparison" className="hover:text-royal transition-colors">Country Cost Matrix</Link></li>
           </ul>
         </div>

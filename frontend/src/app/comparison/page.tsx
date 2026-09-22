@@ -17,7 +17,7 @@ export default function ComparisonPage() {
   const loadComparison = async () => {
     setIsLoading(true);
     try {
-      const data = await compareCountries(['DE', 'NL', 'GB', 'US', 'MY'], selectedCurrency);
+      const data = await compareCountries(['DE', 'NL', 'GB', 'US', 'CA', 'AU', 'SE', 'SG', 'FR', 'MY'], selectedCurrency);
       setComparisonData(data);
     } catch (err) {
       console.error('Failed to load comparison data:', err);
@@ -38,6 +38,8 @@ export default function ComparisonPage() {
     MYR: 'RM',
     CAD: 'C$',
     AUD: 'A$',
+    SEK: 'kr',
+    SGD: 'S$',
   };
 
   // Recharts Chart Data formatting
@@ -86,7 +88,7 @@ export default function ComparisonPage() {
             Display Currency FX:
           </span>
           <div className="flex flex-wrap gap-1.5">
-            {['USD', 'EUR', 'GBP', 'MYR', 'CAD', 'AUD'].map((curr) => (
+            {['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'SEK', 'SGD', 'MYR'].map((curr) => (
               <button
                 key={curr}
                 onClick={() => {
@@ -208,23 +210,43 @@ export default function ComparisonPage() {
                   </span>
                 </div>
 
-                {/* Scope Coverage */}
-                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs font-mono space-y-1.5">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Active Rules:</span>
-                    <span className="text-slate-900 font-bold">{country.totalScholarshipRules} Rules</span>
+                {/* Post-Study Work & Immigration Profile */}
+                {country.visaAndWorkProfile && (
+                  <div className="bg-emerald-50/70 p-3.5 rounded-2xl border border-emerald-200 text-xs font-mono space-y-2">
+                    <div className="flex justify-between items-center border-b border-emerald-200/60 pb-1.5">
+                      <span className="text-emerald-900 font-bold">Post-Study Work Visa:</span>
+                      <span className="text-emerald-950 font-extrabold px-2 py-0.5 rounded-md bg-emerald-200/70 text-[11px]">
+                        {country.visaAndWorkProfile.postStudyWorkMonths} Months
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] text-emerald-800 space-y-1">
+                      <p><strong>Permit:</strong> {country.visaAndWorkProfile.permitName}</p>
+                      <p><strong>In-Study Work:</strong> {country.visaAndWorkProfile.inStudyWorkHoursWeekly} hrs/week | <strong>Spouse:</strong> {country.visaAndWorkProfile.allowsSpouseWork ? '✅ Work Allowed' : '❌ Restricted'}</p>
+                      <p><strong>PR Pathway:</strong> {country.visaAndWorkProfile.pathwayToPR}</p>
+                    </div>
+
+                    <div className="pt-1.5 border-t border-emerald-200/60 flex justify-between items-center text-[11px]">
+                      <span className="text-emerald-900">Median Grad Salary:</span>
+                      <strong className="text-emerald-950 font-extrabold">
+                        {currencySymbols[selectedCurrency] || ''}{country.visaAndWorkProfile.medianGraduateSalary?.toLocaleString()} / yr
+                      </strong>
+                    </div>
+
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-emerald-900">Estimated Payback:</span>
+                      <strong className="text-emerald-950 font-extrabold bg-emerald-200 px-2 py-0.5 rounded">
+                        ~{country.visaAndWorkProfile.estimatedPaybackYears} Years
+                      </strong>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Post-Grad Work Permit:</span>
-                    <span className="text-emerald-700 font-bold">18-36 Months</span>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
 
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
               <span className="text-xs text-slate-500 font-mono font-medium flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> UN M49 Verified
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> 100% Regulatory Data
               </span>
               <a
                 href={`/search?country=${country.isoCode}`}

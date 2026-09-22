@@ -57,3 +57,43 @@ export function normalizeGpaToFourPoint(gpa: number, scale: number | string = 4.
   // Standard 4.0 Scale
   return parseFloat((Math.min(4.0, Math.max(0.0, gpa))).toFixed(2));
 }
+
+/**
+ * Calculates holistic work experience compensation for working professionals.
+ * Formula: Effective GPA = Normalized GPA + min(0.35, YearsExp * 0.05 * RelevanceMultiplier)
+ */
+export function calculateWorkExpCompensation(
+  normalizedGpa: number,
+  yearsExp = 0,
+  relevance: 'DIRECT' | 'ADJACENT' | 'GENERAL' = 'DIRECT'
+): {
+  originalNormalizedGpa: number;
+  effectiveGpa: number;
+  gpaBoost: number;
+  yearsExp: number;
+  relevance: 'DIRECT' | 'ADJACENT' | 'GENERAL';
+} {
+  if (!yearsExp || yearsExp <= 0) {
+    return {
+      originalNormalizedGpa: normalizedGpa,
+      effectiveGpa: normalizedGpa,
+      gpaBoost: 0,
+      yearsExp: 0,
+      relevance,
+    };
+  }
+
+  const multiplier = relevance === 'DIRECT' ? 1.0 : relevance === 'ADJACENT' ? 0.6 : 0.3;
+  // Capped at +0.35 max compensation on 4.0 scale
+  const boost = Math.min(0.35, parseFloat((yearsExp * 0.05 * multiplier).toFixed(2)));
+  const effectiveGpa = Math.min(4.0, parseFloat((normalizedGpa + boost).toFixed(2)));
+
+  return {
+    originalNormalizedGpa: normalizedGpa,
+    effectiveGpa,
+    gpaBoost: boost,
+    yearsExp,
+    relevance,
+  };
+}
+

@@ -1,6 +1,7 @@
-import { Controller, Get, Param, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Param, Query, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { TaxonomyService } from './taxonomy.service';
+import { GeographicTreeQueryDto } from './dto/geographic-tree-query.dto';
 
 @ApiTags('Taxonomy & Geography')
 @Controller('api/v1/taxonomy')
@@ -11,6 +12,12 @@ export class TaxonomyController {
   @ApiOperation({ summary: 'Get UN M49 Geographic Tree (Continent -> Region -> Country)' })
   async getTree() {
     return this.taxonomyService.getGeographicTree();
+  }
+
+  @Get('programs-tree')
+  @ApiOperation({ summary: 'Get complete UN M49 Global Geographic Program Tree (Continent -> Region -> Country -> Programs) with metrics' })
+  async getGeographicProgramsTree(@Query() query: GeographicTreeQueryDto) {
+    return this.taxonomyService.getGeographicProgramsTree(query);
   }
 
   @Get('countries')

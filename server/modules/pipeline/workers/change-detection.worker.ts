@@ -1,6 +1,8 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { RabbitMQService } from '../../../common/services/rabbitmq.service';
 import { PrismaService } from '../../../common/services/prisma.service';
+import { RedisService } from '../../../common/services/redis.service';
+import { OpenSearchService } from '../../../common/services/opensearch.service';
 import { RABBITMQ_QUEUES } from '../../../common/constants/queues.constant';
 import * as crypto from 'crypto';
 
@@ -16,7 +18,9 @@ export class ChangeDetectionWorker implements OnModuleInit {
 
   constructor(
     private readonly rabbitmq: RabbitMQService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
+    private readonly openSearch: OpenSearchService
   ) {}
 
   async onModuleInit() {
@@ -33,6 +37,7 @@ export class ChangeDetectionWorker implements OnModuleInit {
       where: { id: payload.programId },
       include: {
         university: true,
+        campus: { include: { country: true } },
         requirements: { where: { validTo: null } }, // Active requirement version
       },
     });
@@ -76,9 +81,7 @@ export class ChangeDetectionWorker implements OnModuleInit {
     // ==========================================
     // STAGE B: EXTRACT & LEDGER EVENT SOURCING
     // ==========================================
-    // Simulate LLM / regex structured extraction of requirements from HTML content
     const extractedData = this.simulateStructuredExtraction(payload.scrapedHtmlContent, program.requirements[0]);
-
     const activeReq = program.requirements[0];
 
     // Check if extracted requirements differ from currently active requirement
@@ -93,53 +96,80 @@ export class ChangeDetectionWorker implements OnModuleInit {
       return;
     }
 
-    this.logger.log(`[STAGE B - REQUIREMENT DIFF CONFIRMED] Updating ProgramRequirement event-sourcing ledger for '${program.title}'`);
+    this.logger.log(`[STAGE B - REQUIREMENT DIFF CONFIRMED] Updating ProgramRequirement event-sourcing ledger atomically for '${program.title}'`);
 
     const now = new Date();
 
-    // 1. Event Sourcing: Close the old requirement version
-    if (activeReq) {
-      await this.prisma.programRequirement.update({
-        where: { id: activeReq.id },
-        data: { validTo: now },
-      });
-    }
+    // Execute atomic event-sourcing update via Prisma $transaction
+    const newReq = await this.prisma.$transaction(async (tx) => {
+      // 1. Close the old requirement version
+      if (activeReq) {
+        await tx.programRequirement.update({
+          where: { id: activeReq.id },
+          data: { validTo: now },
+        });
+      }
 
-    // 2. Insert new versioned requirement row (validFrom = NOW(), validTo = NULL)
-    const newReq = await this.prisma.programRequirement.create({
-      data: {
-        programId: program.id,
-        minGpa: extractedData.minGpa,
-        minGpaOriginal: extractedData.minGpa,
-        gpaScale: 4.0,
-        minIelts: extractedData.minIelts,
-        minToefl: extractedData.minToefl,
-        minGre: extractedData.minGre,
-        requiresPapers: extractedData.requiresPapers,
-        minPapersCount: extractedData.minPapersCount,
-        sourceUrl: payload.sourceUrl,
-        confidence: 'SCRAPED_UNVERIFIED',
-        validFrom: now,
-        validTo: null,
-      },
-    });
-
-    // 3. Record Audit Log Ledger
-    await this.prisma.requirementAuditLog.create({
-      data: {
-        programId: program.id,
-        oldRequirementId: activeReq?.id || null,
-        newRequirementId: newReq.id,
-        extractionDiffJson: {
-          old: activeReq ? { minGpa: activeReq.minGpa, minIelts: activeReq.minIelts, minGre: activeReq.minGre } : null,
-          new: { minGpa: newReq.minGpa, minIelts: newReq.minIelts, minGre: newReq.minGre },
-          detectedAt: now.toISOString(),
+      // 2. Insert new versioned requirement row
+      const created = await tx.programRequirement.create({
+        data: {
+          programId: program.id,
+          minGpa: extractedData.minGpa,
+          minGpaOriginal: extractedData.minGpa,
+          gpaScale: 4.0,
+          minIelts: extractedData.minIelts,
+          minToefl: extractedData.minToefl,
+          minGre: extractedData.minGre,
+          requiresPapers: extractedData.requiresPapers,
+          minPapersCount: extractedData.minPapersCount,
+          sourceUrl: payload.sourceUrl,
+          confidence: 'SCRAPED_UNVERIFIED',
+          validFrom: now,
+          validTo: null,
         },
-        performedBy: 'AUTOMATED_STAGE_B_PARSER',
-      },
+      });
+
+      // 3. Record Audit Log Ledger
+      await tx.requirementAuditLog.create({
+        data: {
+          programId: program.id,
+          oldRequirementId: activeReq?.id || null,
+          newRequirementId: created.id,
+          extractionDiffJson: {
+            old: activeReq ? { minGpa: activeReq.minGpa, minIelts: activeReq.minIelts, minGre: activeReq.minGre } : null,
+            new: { minGpa: created.minGpa, minIelts: created.minIelts, minGre: created.minGre },
+            detectedAt: now.toISOString(),
+          },
+          performedBy: 'AUTOMATED_STAGE_B_PARSER',
+        },
+      });
+
+      return created;
     });
 
-    this.logger.log(`[LEDGER UPDATED] Successfully created new ProgramRequirement version '${newReq.id}' for program '${program.id}'`);
+    this.logger.log(`[LEDGER UPDATED] Successfully committed atomic ProgramRequirement transaction version '${newReq.id}' for program '${program.id}'`);
+
+    // Synchronize document update to OpenSearch and invalidate caches
+    try {
+      await this.openSearch.indexProgramDocument({
+        programId: program.id,
+        title: program.title,
+        fieldOfStudy: program.fieldOfStudy,
+        degreeLevel: program.degreeLevel,
+        universityId: program.university.id,
+        universityName: program.university.name,
+        countryIsoCode: program.campus?.country?.isoCode || 'GLOBAL',
+        countryName: program.campus?.country?.name || 'International',
+        minGpa: newReq.minGpa,
+        minIelts: newReq.minIelts,
+        minGre: newReq.minGre,
+        tuitionFeeLocal: program.tuitionFeeLocal,
+        currencyCode: program.currencyCode,
+      });
+      await this.redis.set(`program:${program.id}:outcomes`, null, 1);
+    } catch (syncErr) {
+      this.logger.warn(`Search/cache sync after change detection had non-fatal warning:`, syncErr.message);
+    }
   }
 
   private simulateStructuredExtraction(html: string, currentReq?: any) {

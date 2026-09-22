@@ -50,9 +50,22 @@ export class MatchRequestDto {
   @IsOptional()
   targetDegree?: DegreeLevel = DegreeLevel.MS;
 
+  @ApiProperty({ example: 3, description: 'Years of post-undergraduate industry work experience', default: 0, required: false })
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @Max(30)
+  workExpYears?: number = 0;
+
+  @ApiProperty({ example: 'DIRECT', description: 'Relevance of work experience to target field (DIRECT, ADJACENT, GENERAL)', default: 'DIRECT', required: false })
+  @IsString()
+  @IsOptional()
+  workExpRelevance?: 'DIRECT' | 'ADJACENT' | 'GENERAL' = 'DIRECT';
+
   @ApiProperty({ example: ['DE', 'NL', 'GB'], description: 'Preferred ISO country codes', required: false })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   preferredCountryIsoCodes?: string[];
 }
+

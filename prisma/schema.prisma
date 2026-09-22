@@ -50,12 +50,31 @@ model Country {
   universities          University[]
   campuses              Campus[]
   scholarshipRules      ScholarshipRule[] // Country-scope scholarships (e.g. DAAD, Chevening)
+  workAndVisaProfile    CountryWorkAndVisaProfile?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([regionId])
 }
+
+model CountryWorkAndVisaProfile {
+  id                      String   @id @default(uuid())
+  countryId               String   @unique
+  country                 Country  @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  
+  postStudyWorkMonths     Int      @default(12) // e.g. 18 in Germany, 24 in UK, 36 in US STEM
+  postStudyWorkPermitName String   @default("Graduate Work Visa") // e.g. "Jobseeker Permit §20 AufenthG", "Graduate Route", "STEM OPT"
+  inStudyWorkHoursPerWeek Int      @default(20) // Part-time allowed during semester
+  allowsSpouseWorkVisa    Boolean  @default(false)
+  pathwayToPermanentRes   String   // e.g. "EU Blue Card (21 mos with B1 German / 27 mos with A1 German)"
+  minBlockedAccountUsd    Float    @default(0.0) // Proof of living funds (e.g. €992/mo = $1,080/mo)
+  medianGraduateSalaryUsd Float    @default(0.0) // National median starting salary for Master's graduates
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 
 // ==========================================
 // INSTITUTIONAL HIERARCHY & CAMPUSES
