@@ -67,5 +67,40 @@ export class MatchRequestDto {
   @IsString({ each: true })
   @IsOptional()
   preferredCountryIsoCodes?: string[];
+
+  // Category A: ECTS & Credit Prerequisites
+  @ApiProperty({ example: 18, description: 'Undergraduate Mathematics/Statistics credits completed', required: false })
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  mathCredits?: number;
+
+  @ApiProperty({ example: 20, description: 'Undergraduate Computer Science/Technical credits completed', required: false })
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  csCredits?: number;
+
+  @ApiProperty({ example: 10, description: 'Undergraduate Theoretical foundations credits completed', required: false })
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  theoryCredits?: number;
+
+  @ApiProperty({ example: 'ECTS', description: 'Credit system scale: ECTS, US_SEMESTER, INDIAN_SEMESTER, UK_CATS', default: 'ECTS', required: false })
+  @IsString()
+  @IsOptional()
+  creditScale?: 'ECTS' | 'US_SEMESTER' | 'INDIAN_SEMESTER' | 'UK_CATS' = 'ECTS';
+
+  // Category C: English Medium of Instruction (MOI)
+  @ApiProperty({ example: true, description: 'Whether previous undergraduate degree was 100% taught in English (MOI)', default: false, required: false })
+  @IsOptional()
+  undergradTaughtInEnglish?: boolean = false;
+
+  // Applicant nationality for APS and visa regulation checking
+  @ApiProperty({ example: 'IN', description: 'Applicant country of nationality (ISO 3166-1 alpha-2 code)', required: false })
+  @IsString()
+  @IsOptional()
+  applicantCountryIsoCode?: string;
 }
 

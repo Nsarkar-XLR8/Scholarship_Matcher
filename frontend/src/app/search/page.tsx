@@ -96,9 +96,9 @@ function SearchContent() {
   const { showToast } = useToast();
   const { isShortlisted, toggleShortlist } = useShortlist();
 
-  // Active View Mode: 'geography' (UN M49 Hierarchy) vs 'grid' (Faceted Search)
-  const [viewMode, setViewMode] = useState<'geography' | 'grid'>(
-    (searchParams.get('view') as 'geography' | 'grid') || 'geography'
+  // Active View Mode: 'geography' (UN M49 Hierarchy) vs 'grid' (Faceted Search) vs 'map' (Interactive Global Map)
+  const [viewMode, setViewMode] = useState<'geography' | 'grid' | 'map'>(
+    (searchParams.get('view') as 'geography' | 'grid' | 'map') || 'geography'
   );
 
   // Filters State
@@ -116,6 +116,9 @@ function SearchContent() {
     searchParams.get('hasScholarship') === 'true'
   );
   const [sortBy, setSortBy] = useState<string>('relevance');
+
+  // Selected Map Pin State
+  const [selectedMapPin, setSelectedMapPin] = useState<any | null>(null);
 
   // Data State
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -173,9 +176,10 @@ function SearchContent() {
   // Sync and trigger searches
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (viewMode === 'geography') {
+      if (viewMode === 'geography' || viewMode === 'map') {
         loadGeoTree();
-      } else {
+      }
+      if (viewMode === 'grid' || viewMode === 'map') {
         handleFacetedSearch();
       }
     }, 250);
@@ -222,11 +226,11 @@ function SearchContent() {
 
         {/* View Mode Toggle */}
         <div className="flex justify-center mt-6">
-          <div className="inline-flex items-center p-1.5 rounded-2xl bg-slate-100 border border-slate-200 shadow-inner">
+          <div className="inline-flex flex-wrap items-center justify-center p-1.5 rounded-2xl bg-slate-100 border border-slate-200 shadow-inner gap-1">
             <button
               type="button"
               onClick={() => setViewMode('geography')}
-              className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
                 viewMode === 'geography'
                   ? 'bg-gradient-to-r from-blue-600 to-royal text-white shadow-md shadow-blue-500/20'
                   : 'text-slate-600 hover:text-royal'
@@ -238,7 +242,7 @@ function SearchContent() {
             <button
               type="button"
               onClick={() => setViewMode('grid')}
-              className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
                 viewMode === 'grid'
                   ? 'bg-gradient-to-r from-blue-600 to-royal text-white shadow-md shadow-blue-500/20'
                   : 'text-slate-600 hover:text-royal'
@@ -246,6 +250,18 @@ function SearchContent() {
             >
               <LayoutGrid className="w-4 h-4" />
               <span>Faceted Search Grid</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('map')}
+              className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+                viewMode === 'map'
+                  ? 'bg-gradient-to-r from-blue-600 to-royal text-white shadow-md shadow-blue-500/20'
+                  : 'text-slate-600 hover:text-royal'
+              }`}
+            >
+              <MapPin className="w-4 h-4" />
+              <span>Global Map View</span>
             </button>
           </div>
         </div>
@@ -656,6 +672,174 @@ function SearchContent() {
       )}
 
       {/* ========================================================================= */}
+      {/* MODE C: INTERACTIVE GLOBAL MAP VIEW */}
+      {/* ========================================================================= */}
+      {viewMode === 'map' && (
+        <div className="space-y-6">
+          {/* Map Header & Info */}
+          <div className="p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-navy to-blue-950 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-800">
+            <div>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                Interactive Geospatial University Explorer
+              </span>
+              <h2 className="text-2xl font-bold font-outfit text-white mt-1">
+                Global Campus Hubs & Geographic Distribution
+              </h2>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Explore worldwide campuses with exact geographic coordinates, local tuition benchmarks, and post-study stayback terms.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 text-xs font-mono bg-white/5 p-3 rounded-2xl border border-white/10">
+              <span className="text-slate-400">Hubs Active:</span>
+              <strong className="text-emerald-400">10 International Destinations</strong>
+            </div>
+          </div>
+
+          {/* Interactive World Grid & Map Canvas */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left: Interactive Campus Hubs Map Grid */}
+            <div className="lg:col-span-8 bg-slate-950 p-6 rounded-3xl border border-slate-800 shadow-2xl relative overflow-hidden min-h-[480px] flex flex-col justify-between">
+              {/* Stylized Geospatial Grid Background */}
+              <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none" />
+              
+              <div className="relative z-10 flex justify-between items-center pb-4 border-b border-slate-800/80">
+                <span className="text-xs font-mono font-bold text-slate-400 flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-royal" /> Top Geographic Destination Clusters
+                </span>
+                <span className="text-[10px] font-mono text-slate-500">
+                  Click any hub to inspect local universities & programs
+                </span>
+              </div>
+
+              {/* Geographic Hub Clusters */}
+              <div className="relative z-10 grid grid-cols-2 sm:grid-cols-3 gap-3 my-4">
+                {[
+                  { name: 'Munich & Bavaria', country: 'Germany', code: 'DE', lat: 48.1497, lng: 11.5680, tuition: '€0 - €6,000/yr', stayback: '18 Months', unis: ['TUM', 'LMU Munich'] },
+                  { name: 'Oxford & London Hub', country: 'United Kingdom', code: 'GB', lat: 51.7548, lng: -1.2544, tuition: '£28k - £45k/yr', stayback: '24 Months', unis: ['Oxford', 'Imperial', 'UCL'] },
+                  { name: 'Delft & Randstad', country: 'Netherlands', code: 'NL', lat: 52.0021, lng: 4.3705, tuition: '€20,500/yr', stayback: '12 Months (Zoekjaar)', unis: ['TU Delft', 'Univ of Amsterdam'] },
+                  { name: 'Toronto & Ontario', country: 'Canada', code: 'CA', lat: 43.6629, lng: -79.3957, tuition: 'CAD $42,000/yr', stayback: 'Up to 3 Years (PGWP)', unis: ['Univ of Toronto', 'Waterloo'] },
+                  { name: 'California & East Coast', country: 'United States', code: 'US', lat: 37.4275, lng: -122.1697, tuition: '$45k - $60k/yr', stayback: '36 Months (STEM OPT)', unis: ['Stanford', 'CMU', 'MIT'] },
+                  { name: 'Stockholm & Nordic', country: 'Sweden', code: 'SE', lat: 59.3498, lng: 18.0707, tuition: 'SEK 160,000/yr', stayback: '12 Months', unis: ['KTH Royal Institute', 'Lund'] },
+                  { name: 'Singapore Hub', country: 'Singapore', code: 'SG', lat: 1.2966, lng: 103.7764, tuition: 'SGD 45,000/yr', stayback: '12 Months (LTVP)', unis: ['NUS', 'NTU Singapore'] },
+                  { name: 'Melbourne & Sydney', country: 'Australia', code: 'AU', lat: -37.7982, lng: 144.9610, tuition: 'AUD $48,000/yr', stayback: '24 - 36 Months', unis: ['Univ of Melbourne', 'UNSW'] },
+                  { name: 'Paris Region', country: 'France', code: 'FR', lat: 48.7128, lng: 2.2084, tuition: '€3,770 - €18,000/yr', stayback: '12 Months (APS/RECE)', unis: ['Institut Polytechnique', 'Sorbonne'] },
+                ].map((hub) => {
+                  const isSelected = selectedMapPin?.name === hub.name;
+                  return (
+                    <button
+                      key={hub.name}
+                      type="button"
+                      onClick={() => {
+                        setSelectedMapPin(hub);
+                        setCountryIsoCode(hub.code);
+                      }}
+                      className={`p-3.5 rounded-2xl border text-left transition-all ${
+                        isSelected
+                          ? 'bg-blue-600/30 border-blue-400 shadow-lg shadow-blue-500/20 text-white'
+                          : 'bg-slate-900/80 border-slate-800 hover:border-slate-700 text-slate-300 hover:bg-slate-800/80'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="text-[10px] font-mono font-bold text-royal bg-blue-500/20 px-2 py-0.5 rounded text-blue-300">
+                          {hub.code}
+                        </span>
+                        <MapPin className={`w-3.5 h-3.5 ${isSelected ? 'text-amber-400 fill-amber-400' : 'text-slate-500'}`} />
+                      </div>
+                      <h4 className="text-xs font-bold font-outfit text-white leading-tight">{hub.name}</h4>
+                      <p className="text-[10px] text-slate-400 font-mono mt-1">{hub.country}</p>
+                      <div className="mt-2 pt-2 border-t border-slate-800 text-[10px] font-mono text-slate-400 flex justify-between">
+                        <span>Stayback:</span>
+                        <strong className="text-emerald-400">{hub.stayback}</strong>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="relative z-10 pt-3 border-t border-slate-800/80 flex justify-between items-center text-[11px] font-mono text-slate-400">
+                <span>Coordinates Reference: WGS 84 Projection</span>
+                <span className="text-royal font-semibold">100% Stateless Zero-Auth Platform</span>
+              </div>
+            </div>
+
+            {/* Right: Selected Hub Programs Inspector */}
+            <div className="lg:col-span-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xl flex flex-col justify-between space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold font-outfit text-slate-navy flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-royal" />
+                    <span>{selectedMapPin ? selectedMapPin.name : 'All Destination Hubs'}</span>
+                  </h3>
+                  {selectedMapPin && (
+                    <button
+                      onClick={() => {
+                        setSelectedMapPin(null);
+                        setCountryIsoCode('');
+                      }}
+                      className="text-[10px] font-mono text-slate-400 hover:text-royal underline"
+                    >
+                      Reset Hub
+                    </button>
+                  )}
+                </div>
+
+                {selectedMapPin ? (
+                  <div className="space-y-2 text-xs font-mono bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Destination:</span>
+                      <strong className="text-slate-900">{selectedMapPin.country}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Coordinates:</span>
+                      <span className="text-slate-700">{selectedMapPin.lat.toFixed(4)}° N, {selectedMapPin.lng.toFixed(4)}° E</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Tuition Benchmark:</span>
+                      <strong className="text-royal">{selectedMapPin.tuition}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Post-Study Visa:</span>
+                      <strong className="text-emerald-700">{selectedMapPin.stayback}</strong>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Select any geographic hub on the map to filter verified master's programs with statutory blocked account terms and prerequisite requirements.
+                  </p>
+                )}
+
+                {/* Filtered Programs List Preview */}
+                <div className="space-y-2 max-h-[260px] overflow-y-auto pt-2" data-lenis-prevent="true">
+                  {(searchResults?.items || []).slice(0, 6).map((item: any) => (
+                    <div
+                      key={item.id}
+                      onClick={() => setSelectedProgram(item)}
+                      className="p-3 rounded-xl bg-slate-50 hover:bg-blue-50/50 border border-slate-200 hover:border-royal transition-all cursor-pointer space-y-1"
+                    >
+                      <h5 className="text-xs font-bold text-slate-900 line-clamp-1">{item.title}</h5>
+                      <div className="flex justify-between text-[10px] font-mono text-slate-500">
+                        <span>{item.universityName}</span>
+                        <strong className="text-royal">{item.tuitionFeeLocal === 0 ? '€0' : `${item.currencyCode} ${item.tuitionFeeLocal.toLocaleString()}`}</strong>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className="w-full py-2.5 rounded-xl bg-royal hover:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/20 transition-all"
+              >
+                <span>View Full Faceted Grid ({searchResults?.total || 0} Programs)</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* MODE B: FACETED SEARCH GRID */}
       {/* ========================================================================= */}
       {viewMode === 'grid' && (
@@ -906,6 +1090,41 @@ function SearchContent() {
                       <strong className="text-slate-800">
                         {selectedProgram.requirements?.workExpYearsRequired ? `${selectedProgram.requirements.workExpYearsRequired} Years` : 'Fresh Grads Welcome'}
                       </strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Category C: Application Document Checklist & Word Caps */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-royal" /> Application Document Intelligence
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs font-mono">
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 block text-[10px]">SOP Word Cap:</span>
+                      <strong className="text-slate-900">{selectedProgram.sopMaxWords ? `${selectedProgram.sopMaxWords} Words` : '500 - 1000 Words'}</strong>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 block text-[10px]">LORs Required:</span>
+                      <strong className="text-slate-900">{selectedProgram.lorAcademicCount || 2} Academic {selectedProgram.lorProfessionalCount ? `+ ${selectedProgram.lorProfessionalCount} Prof` : ''}</strong>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 block text-[10px]">CV / Resume Format:</span>
+                      <strong className="text-slate-900">{selectedProgram.cvFormatRequired || 'Europass / Standard'}</strong>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 block text-[10px]">Portfolio / GitHub:</span>
+                      <strong className={selectedProgram.portfolioRequired ? 'text-amber-700' : 'text-slate-700'}>
+                        {selectedProgram.portfolioRequired ? 'Required' : 'Optional / Not Required'}
+                      </strong>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 block text-[10px]">MOI English Waiver:</span>
+                      <strong className="text-emerald-700">Accepted with Letter</strong>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <span className="text-slate-400 block text-[10px]">Evaluation Portal:</span>
+                      <strong className="text-slate-900">Direct / uni-assist VPD</strong>
                     </div>
                   </div>
                 </div>

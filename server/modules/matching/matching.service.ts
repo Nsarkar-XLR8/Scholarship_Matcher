@@ -4,6 +4,7 @@ import { RedisService } from '../../common/services/redis.service';
 import { MatchRequestDto } from './dto/match-request.dto';
 import { normalizeGpaToFourPoint, calculateWorkExpCompensation } from '../../common/utils/gpa-converter.util';
 import { getScoreRequirementsBreakdown, TestScoreRequirementsBreakdown, toeflToIelts, duolingoToIelts, pteToIelts } from '../../common/utils/language-test-converter.util';
+import { evaluateCreditPrerequisites, PrerequisiteEvaluationResult } from '../../common/utils/credit-converter.util';
 
 export interface ApplicationMilestoneSchedule {
   languageTestBy: string;
@@ -27,6 +28,9 @@ export interface MatchResultItem {
   intakeSeason?: string | null;
   milestones?: ApplicationMilestoneSchedule;
   campusName: string;
+  campusCity?: string;
+  latitude?: number;
+  longitude?: number;
   countryName: string;
   countryIsoCode: string;
   tuitionFeeLocal: number;
@@ -43,7 +47,29 @@ export interface MatchResultItem {
     minGmat: number | null;
     workExpYearsRequired: number;
     requiresPapers: boolean;
+    minMathEcts?: number;
+    minCsEcts?: number;
+    minTheoreticalEcts?: number;
+    acceptsMoiEnglishWaiver?: boolean;
     scoreBreakdown: TestScoreRequirementsBreakdown;
+  };
+  prerequisiteEvaluation?: PrerequisiteEvaluationResult;
+  moiWaiver?: {
+    acceptedByProgram: boolean;
+    waiverApplied: boolean;
+    note: string;
+  };
+  credentialVerification?: {
+    apsRequired: boolean;
+    anabinRecognition: string;
+    uniAssistVpdRequired: boolean;
+  };
+  documentChecklist?: {
+    sopMaxWords: number;
+    lorAcademicCount: number;
+    lorProfessionalCount: number;
+    cvFormatRequired: string;
+    portfolioRequired: boolean;
   };
   scholarshipOffer: {
     publishedRules: Array<{
@@ -120,7 +146,13 @@ export class MatchingService {
           include: { primaryCountry: true },
         },
         campus: {
-          include: { country: true },
+          include: {
+            country: {
+              include: {
+                workAndVisaProfile: true,
+              },
+            },
+          },
         },
         requirements: {
           where: { validTo: null }, // Active requirement version
@@ -184,15 +216,43 @@ export class MatchingService {
       const activeReq = program.requirements[0];
       if (!activeReq) continue;
 
+      const reqAny = activeReq as any;
+      const progAny = program as any;
+
+      // Category A: ECTS & Subject Prerequisite Evaluation
+      const prereqEvaluation = evaluateCreditPrerequisites(
+        {
+          mathCredits: dto.mathCredits,
+          csCredits: dto.csCredits,
+          theoreticalCredits: dto.theoryCredits,
+          creditScale: dto.creditScale || 'ECTS',
+        },
+        {
+          minMathEcts: reqAny.minMathEcts || 0,
+          minCsEcts: reqAny.minCsEcts || 0,
+          minTheoreticalEcts: reqAny.minTheoreticalEcts || 0,
+        }
+      );
+
+      // Disqualify if credit deficit exceeds conditional bridge allowance (>15 ECTS)
+      if (!prereqEvaluation.isEligibleForAdmission) {
+        continue;
+      }
+
       // 2. Minimum requirement evaluation using effective GPA (with work experience boost)
       const reqMinGpa = activeReq.minGpa;
       const gpaDiff = effectiveGpa - reqMinGpa;
 
       const meetsGpa = gpaDiff >= -0.2; // Allow tolerance for REACH status
 
-      // Language score cross-evaluation (IELTS, TOEFL, Duolingo, PTE)
+      // Category C: Language score cross-evaluation (IELTS, TOEFL, Duolingo, PTE, MOI Waiver)
       let meetsLanguage = true;
-      if (activeReq.minIelts && effectiveStudentIelts) {
+      let moiWaiverApplied = false;
+
+      if (dto.undergradTaughtInEnglish && reqAny.acceptsMoiEnglishWaiver) {
+        meetsLanguage = true;
+        moiWaiverApplied = true;
+      } else if (activeReq.minIelts && effectiveStudentIelts) {
         meetsLanguage = effectiveStudentIelts >= activeReq.minIelts;
       } else if (activeReq.minToefl && dto.toefl) {
         meetsLanguage = dto.toefl >= activeReq.minToefl;
@@ -219,6 +279,7 @@ export class MatchingService {
       if (dto.papersCount && dto.papersCount > 0) fitScore += Math.min(10, dto.papersCount * 5);
       if (dto.workExpYears && dto.workExpYears > 0) fitScore += Math.min(8, dto.workExpYears * 2);
       if (program.university.rankingQs && program.university.rankingQs <= 50) fitScore += 5;
+      if (prereqEvaluation.status === 'PREREQUISITES_SATISFIED') fitScore += 3;
       fitScore = Math.min(99, Math.max(40, fitScore));
 
       // 3. Multi-Scoped Scholarship Scope Resolution from Batch Maps
@@ -274,7 +335,6 @@ export class MatchingService {
         };
       }
 
-      const reqAny = activeReq as any;
       // Generate human-readable complete score requirements breakdown
       const scoreBreakdown = getScoreRequirementsBreakdown({
         minGpa: activeReq.minGpa,
@@ -290,7 +350,6 @@ export class MatchingService {
         minPapersCount: activeReq.minPapersCount,
       });
 
-      const progAny = program as any;
       const officialWebsiteUrl = progAny.officialSourceUrl
         || (program.university.domain ? `https://${program.university.domain.replace(/^https?:\/\//i, '')}` : null);
 
@@ -307,6 +366,12 @@ export class MatchingService {
         visaAppointmentBy: new Date(baseDeadlineDate.getTime() + 75 * 86400000).toISOString().split('T')[0],
       };
 
+      // Category A & B: Visa & Credential regulations resolution
+      const visaProfile = (program.campus.country as any).workAndVisaProfile;
+      const applicantIso = dto.applicantCountryIsoCode?.toUpperCase();
+      const isApsSubjectCountry = applicantIso ? ['IN', 'CN', 'VN'].includes(applicantIso) : false;
+      const apsRequired = program.campus.country.isoCode === 'DE' && (visaProfile?.requiresApsCertificate ?? true) && (isApsSubjectCountry || !applicantIso);
+
       matches.push({
         programId: program.id,
         programTitle: program.title,
@@ -321,6 +386,9 @@ export class MatchingService {
         intakeSeason: progAny.intakeSeason,
         milestones,
         campusName: program.campus.name,
+        campusCity: program.campus.city,
+        latitude: (program.campus as any).latitude || 0.0,
+        longitude: (program.campus as any).longitude || 0.0,
         countryName: program.campus.country.name,
         countryIsoCode: program.campus.country.isoCode,
         tuitionFeeLocal: program.tuitionFeeLocal,
@@ -337,7 +405,33 @@ export class MatchingService {
           minGmat: reqAny.minGmat || null,
           workExpYearsRequired: reqAny.workExpYearsRequired || 0,
           requiresPapers: activeReq.requiresPapers,
+          minMathEcts: reqAny.minMathEcts || 0.0,
+          minCsEcts: reqAny.minCsEcts || 0.0,
+          minTheoreticalEcts: reqAny.minTheoreticalEcts || 0.0,
+          acceptsMoiEnglishWaiver: reqAny.acceptsMoiEnglishWaiver || false,
           scoreBreakdown,
+        },
+        prerequisiteEvaluation: prereqEvaluation,
+        moiWaiver: {
+          acceptedByProgram: reqAny.acceptsMoiEnglishWaiver || false,
+          waiverApplied: moiWaiverApplied,
+          note: moiWaiverApplied
+            ? 'IELTS/TOEFL waived based on English Medium of Instruction (MOI) verification.'
+            : reqAny.acceptsMoiEnglishWaiver
+            ? 'Program accepts English MOI certificate from qualifying undergraduate degrees.'
+            : 'Standard standardized English proficiency test score required by department.',
+        },
+        credentialVerification: {
+          apsRequired,
+          anabinRecognition: visaProfile?.anabinRecognitionType || 'H+',
+          uniAssistVpdRequired: visaProfile?.uniAssistVpdRequired || false,
+        },
+        documentChecklist: {
+          sopMaxWords: progAny.sopMaxWords || 1000,
+          lorAcademicCount: progAny.lorAcademicCount || 2,
+          lorProfessionalCount: progAny.lorProfessionalCount || 0,
+          cvFormatRequired: progAny.cvFormatRequired || 'STANDARD',
+          portfolioRequired: progAny.portfolioRequired || false,
         },
         scholarshipOffer: {
           publishedRules: publishedRulesFormatted,

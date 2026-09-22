@@ -28,11 +28,15 @@ import {
   Download,
   Sliders,
   HelpCircle,
+  Check,
+  Layers,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ConfidenceBadge from '@/components/common/ConfidenceBadge';
 import SearchableSelect, { SelectOption } from '@/components/common/SearchableSelect';
-import { evaluateProfileMatch, MatchResult } from '@/lib/api-client';
+import { evaluateProfileMatch, MatchResult, MatchProgramItem } from '@/lib/api-client';
 import { formatOfficialUrl } from '@/lib/url-formatter.util';
 import { useShortlist, ShortlistedProgram } from '@/context/ShortlistContext';
 import ROICalculatorModal from '@/components/common/ROICalculatorModal';
@@ -62,6 +66,20 @@ const ALL_COUNTRY_OPTIONS = [
   { code: 'MY', label: 'Malaysia 🇲🇾' },
 ];
 
+const APPLICANT_NATIONALITY_OPTIONS: SelectOption[] = [
+  { value: '', label: 'Select Nationality (Global)', icon: '🌐' },
+  { value: 'IN', label: 'India 🇮🇳', sublabel: 'Subject to mandatory APS for Germany' },
+  { value: 'CN', label: 'China 🇨🇳', sublabel: 'Subject to mandatory APS for Germany' },
+  { value: 'VN', label: 'Vietnam 🇻🇳', sublabel: 'Subject to mandatory APS for Germany' },
+  { value: 'US', label: 'United States 🇺🇸', sublabel: 'Standard visa pathway' },
+  { value: 'GB', label: 'United Kingdom 🇬🇧', sublabel: 'Standard visa pathway' },
+  { value: 'DE', label: 'Germany / EU Citizen 🇪🇺', sublabel: 'EEA Freedom of Movement' },
+  { value: 'MY', label: 'Malaysia 🇲🇾', sublabel: 'Standard visa pathway' },
+  { value: 'NG', label: 'Nigeria 🇳🇬', sublabel: 'Standard visa pathway' },
+  { value: 'PK', label: 'Pakistan 🇵🇰', sublabel: 'Standard visa pathway' },
+  { value: 'BD', label: 'Bangladesh 🇧🇩', sublabel: 'Standard visa pathway' },
+];
+
 function MatchContent() {
   const searchParams = useSearchParams();
   const { isShortlisted, toggleShortlist } = useShortlist();
@@ -83,6 +101,15 @@ function MatchContent() {
     urlCountry ? [urlCountry.toUpperCase()] : ['DE', 'NL', 'GB', 'US', 'CA', 'AU', 'SE', 'SG', 'FR', 'MY']
   );
 
+  // Category A & C State
+  const [undergradTaughtInEnglish, setUndergradTaughtInEnglish] = useState<boolean>(false);
+  const [applicantCountry, setApplicantCountry] = useState<string>(searchParams.get('applicantCountry') || 'IN');
+  const [isCreditPrereqOpen, setIsCreditPrereqOpen] = useState<boolean>(false);
+  const [creditScale, setCreditScale] = useState<'ECTS' | 'US_SEMESTER' | 'INDIAN_SEMESTER' | 'UK_CATS'>('ECTS');
+  const [mathCredits, setMathCredits] = useState<number | undefined>(undefined);
+  const [csCredits, setCsCredits] = useState<number | undefined>(undefined);
+  const [theoryCredits, setTheoryCredits] = useState<number | undefined>(undefined);
+
   // Match Filter Tab State
   const [activeTab, setActiveTab] = useState<'ALL' | 'QUALIFIED' | 'REACH' | 'SAFETY'>('ALL');
 
@@ -102,13 +129,19 @@ function MatchContent() {
       const data = await evaluateProfileMatch({
         gpa,
         gpaScale,
-        ielts,
+        ielts: undergradTaughtInEnglish ? undefined : ielts,
         gre,
         papersCount,
         workExpYears: persona === 'PROFESSIONAL' ? workExpYears : 0,
         workExpRelevance,
         targetField,
         preferredCountryIsoCodes: preferredCountries.length > 0 ? preferredCountries : ['DE', 'NL', 'GB', 'US', 'CA', 'AU', 'SE', 'SG', 'FR', 'MY'],
+        mathCredits,
+        csCredits,
+        theoryCredits,
+        creditScale,
+        undergradTaughtInEnglish,
+        applicantCountryIsoCode: applicantCountry || undefined,
       });
 
       setMatchResult(data);
@@ -117,7 +150,24 @@ function MatchContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [gpa, gpaScale, ielts, gre, papersCount, persona, workExpYears, workExpRelevance, targetField, preferredCountries]);
+  }, [
+    gpa,
+    gpaScale,
+    ielts,
+    gre,
+    papersCount,
+    persona,
+    workExpYears,
+    workExpRelevance,
+    targetField,
+    preferredCountries,
+    mathCredits,
+    csCredits,
+    theoryCredits,
+    creditScale,
+    undergradTaughtInEnglish,
+    applicantCountry,
+  ]);
 
   // Debounced auto-evaluation on form change
   useEffect(() => {
@@ -145,58 +195,50 @@ function MatchContent() {
           Evaluate Your Master’s Fit
         </h1>
         <p className="text-slate-600 text-sm sm:text-base">
-          100% accurate conversion across Bavarian, Indian 10.0 CGPA, UK Honours & US scales with holistic work experience compensation for job holders.
+          100% accurate conversion across Bavarian, Indian 10.0 CGPA, UK Honours & US scales with holistic work experience compensation, ECTS credit verification & MOI English waivers.
         </p>
-
-        {/* Persona Switcher Tabs */}
-        <div className="inline-flex p-1.5 bg-slate-100 rounded-2xl border border-slate-200 mt-6 shadow-sm">
-          <button
-            type="button"
-            onClick={() => {
-              setPersona('STUDENT');
-              setWorkExpYears(0);
-            }}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              persona === 'STUDENT'
-                ? 'bg-gradient-to-r from-blue-600 to-royal text-white shadow-md'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <GraduationCap className="w-4 h-4" />
-            <span>Undergrad / Fresh Graduate</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setPersona('PROFESSIONAL');
-              if (workExpYears === 0) setWorkExpYears(3);
-            }}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              persona === 'PROFESSIONAL'
-                ? 'bg-gradient-to-r from-blue-600 to-royal text-white shadow-md'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Briefcase className="w-4 h-4" />
-            <span>Working Professional / Job Holder</span>
-          </button>
-        </div>
       </div>
 
-      {/* Main Layout Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left Column: Interactive Profile Inputs */}
-        <div className="lg:col-span-4">
-          <div className="glass-panel p-6 rounded-3xl border border-slate-200 space-y-6 sticky top-24 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-lg font-bold font-outfit text-slate-navy flex items-center gap-2">
-                {persona === 'PROFESSIONAL' ? <Briefcase className="w-5 h-5 text-royal" /> : <GraduationCap className="w-5 h-5 text-royal" />}
-                {persona === 'PROFESSIONAL' ? 'Professional Profile' : 'Student Profile'}
-              </h3>
-              {isLoading && <RefreshCw className="w-4 h-4 text-royal animate-spin" />}
-            </div>
+      {/* Main Grid Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Column: Interactive Profile Engine Form */}
+        <div className="lg:col-span-4 glass-panel p-6 rounded-3xl border border-slate-200 shadow-xl space-y-6 sticky top-24">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+            <h2 className="text-lg font-bold font-outfit text-slate-navy flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-royal" /> Candidate Profile
+            </h2>
+            {isLoading && <RefreshCw className="w-4 h-4 text-royal animate-spin" />}
+          </div>
 
+          {/* Persona Switcher: Student vs Professional */}
+          <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-100 border border-slate-200 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setPersona('STUDENT')}
+              className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                persona === 'STUDENT'
+                  ? 'bg-white text-royal shadow-sm'
+                  : 'text-slate-600 hover:text-royal'
+              }`}
+            >
+              <GraduationCap className="w-4 h-4" />
+              <span>Student / Grad</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPersona('PROFESSIONAL')}
+              className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                persona === 'PROFESSIONAL'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-amber-700'
+              }`}
+            >
+              <Briefcase className="w-4 h-4" />
+              <span>Professional</span>
+            </button>
+          </div>
+
+          <div className="space-y-4">
             {/* GPA & Scale */}
             <div className="space-y-2">
               <div className="flex justify-between items-center text-xs font-semibold">
@@ -274,19 +316,42 @@ function MatchContent() {
               </div>
             )}
 
+            {/* Category C: MOI English Medium of Instruction Waiver Toggle */}
+            <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-1.5">
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs font-bold text-emerald-950">
+                <input
+                  type="checkbox"
+                  checked={undergradTaughtInEnglish}
+                  onChange={(e) => setUndergradTaughtInEnglish(e.target.checked)}
+                  className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                />
+                <span>Undergraduate Degree was 100% in English (MOI)</span>
+              </label>
+              <p className="text-[10px] text-emerald-800 leading-relaxed pl-6">
+                Waives IELTS/TOEFL for qualifying European universities (e.g., TU Delft, TUM, Nordic institutions) with Medium of Instruction certificate.
+              </p>
+            </div>
+
             {/* Test Scores */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">IELTS Score</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  {undergradTaughtInEnglish ? 'IELTS (Optional / MOI)' : 'IELTS Score'}
+                </label>
                 <input
                   type="number"
                   step="0.5"
                   min="0"
                   max="9"
-                  value={ielts || ''}
+                  disabled={undergradTaughtInEnglish}
+                  value={undergradTaughtInEnglish ? '' : ielts || ''}
                   onChange={(e) => setIelts(e.target.value ? parseFloat(e.target.value) : undefined)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 font-semibold focus:border-royal focus:outline-none shadow-sm"
-                  placeholder="e.g. 7.0"
+                  className={`w-full border rounded-xl px-3 py-2 text-sm font-semibold focus:border-royal focus:outline-none shadow-sm ${
+                    undergradTaughtInEnglish
+                      ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                      : 'bg-white border-slate-200 text-slate-900'
+                  }`}
+                  placeholder={undergradTaughtInEnglish ? 'MOI Active' : 'e.g. 7.0'}
                 />
               </div>
 
@@ -304,17 +369,87 @@ function MatchContent() {
               </div>
             </div>
 
-            {/* Research Papers */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Published Research Papers (DOI)</label>
-              <input
-                type="number"
-                min="0"
-                value={papersCount}
-                onChange={(e) => setPapersCount(parseInt(e.target.value || '0', 10))}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 font-semibold focus:border-royal focus:outline-none shadow-sm"
-              />
+            {/* Category A: Expandable ECTS Prerequisite Credit Checker */}
+            <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+              <button
+                type="button"
+                onClick={() => setIsCreditPrereqOpen(!isCreditPrereqOpen)}
+                className="w-full p-3.5 flex justify-between items-center text-xs font-bold text-slate-800 hover:bg-slate-50 transition-colors"
+              >
+                <span className="flex items-center gap-2 font-outfit">
+                  <Layers className="w-4 h-4 text-royal" /> ECTS Prerequisite Credit Check
+                </span>
+                {isCreditPrereqOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+
+              {isCreditPrereqOpen && (
+                <div className="p-4 pt-1 border-t border-slate-100 space-y-3 bg-slate-50/50">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-[11px] text-slate-500 font-medium">Credit Scale:</span>
+                    <select
+                      value={creditScale}
+                      onChange={(e) => setCreditScale(e.target.value as any)}
+                      className="bg-white border border-slate-200 text-slate-800 text-[11px] font-bold rounded px-2 py-1"
+                    >
+                      <option value="ECTS">ECTS (European Standard)</option>
+                      <option value="US_SEMESTER">US Semester Credits (1.5x)</option>
+                      <option value="INDIAN_SEMESTER">Indian Credits (1.5x)</option>
+                      <option value="UK_CATS">UK CATS (0.5x)</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Math/Stats</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={mathCredits || ''}
+                        onChange={(e) => setMathCredits(e.target.value ? parseFloat(e.target.value) : undefined)}
+                        placeholder="e.g. 18"
+                        className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-xs font-mono font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">CS/Tech</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={csCredits || ''}
+                        onChange={(e) => setCsCredits(e.target.value ? parseFloat(e.target.value) : undefined)}
+                        placeholder="e.g. 20"
+                        className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-xs font-mono font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Theory</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={theoryCredits || ''}
+                        onChange={(e) => setTheoryCredits(e.target.value ? parseFloat(e.target.value) : undefined)}
+                        placeholder="e.g. 10"
+                        className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-xs font-mono font-bold"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Evaluates coursework barriers. Deficits up to 15 ECTS permit conditional bridge courses.
+                  </p>
+                </div>
+              )}
             </div>
+
+            {/* Applicant Nationality Selector */}
+            <SearchableSelect
+              options={APPLICANT_NATIONALITY_OPTIONS}
+              value={applicantCountry}
+              onChange={(val) => setApplicantCountry(val)}
+              label="Applicant Nationality (Visa & APS Rules)"
+              placeholder="Select nationality..."
+              searchPlaceholder="Search country..."
+              icon={<Globe className="w-4 h-4" />}
+            />
 
             {/* Searchable Target Field */}
             <SearchableSelect
@@ -420,7 +555,7 @@ function MatchContent() {
           {/* Results Summary & Filter Tabs */}
           {matchResult && (
             <div className="space-y-6">
-              {/* Category Filter Tabs & Print Button */}
+              {/* Category Filter Tabs */}
               <div className="flex flex-wrap items-center justify-between gap-4 glass-panel p-2.5 rounded-2xl border border-slate-200 shadow-md">
                 <div className="flex items-center gap-1.5">
                   {(['ALL', 'QUALIFIED', 'REACH', 'SAFETY'] as const).map((tab) => {
@@ -453,26 +588,17 @@ function MatchContent() {
                   })}
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <span className="text-xs text-slate-500 font-mono">
-                    Matches: <strong className="text-slate-navy">{matchResult.matches.length}</strong>
+                    Showing <strong>{filteredMatches.length}</strong> evaluated options
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold border border-slate-200 transition-all shadow-sm"
-                    title="Print or Save Shortlist as PDF"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>Print Dossier</span>
-                  </button>
                 </div>
               </div>
 
-              {/* Matched Program Cards */}
-              <div className="space-y-6">
+              {/* Match Cards List */}
+              <div className="space-y-4">
                 <AnimatePresence mode="popLayout">
-                  {filteredMatches.map((m: any, idx: number) => {
+                  {filteredMatches.map((m: MatchProgramItem) => {
                     const statusColors = {
                       QUALIFIED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
                       REACH: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -481,22 +607,22 @@ function MatchContent() {
 
                     const shortlisted = isShortlisted(m.programId);
                     const effectiveGpaUsed = matchResult.effectiveGpa4Scale || matchResult.normalizedGpa4Scale;
-                    const gpaDeficit = m.requirements?.minGpa ? (m.requirements.minGpa - effectiveGpaUsed) : 0;
-                    const ieltsDeficit = (m.requirements?.minIelts && ielts) ? (m.requirements.minIelts - ielts) : 0;
+                    const gpaDeficit = m.requirements?.minGpa ? m.requirements.minGpa - effectiveGpaUsed : 0;
+                    const ieltsDeficit = m.requirements?.minIelts && ielts ? m.requirements.minIelts - ielts : 0;
 
                     return (
                       <motion.div
-                        key={m.programId || idx}
+                        key={m.programId}
+                        layout
                         initial={{ opacity: 0, y: 15 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -15 }}
-                        transition={{ duration: 0.2, delay: idx * 0.05 }}
-                        className="glass-panel p-6 rounded-3xl border border-slate-200 shadow-xl space-y-4 hover:border-royal transition-all"
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="glass-panel p-6 rounded-3xl border border-slate-200 shadow-lg space-y-4 hover:border-royal transition-all"
                       >
-                        {/* Program Card Header */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
+                        {/* Header Details */}
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
                               <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-800">
                                 {m.countryName || m.countryIsoCode}
                               </span>
@@ -508,7 +634,28 @@ function MatchContent() {
                               >
                                 {m.qualificationStatus}
                               </span>
+
+                              {/* Category A: Credential & APS Badges */}
+                              {m.credentialVerification?.apsRequired && (
+                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
+                                  APS Certificate Required ⚠️
+                                </span>
+                              )}
+
+                              {m.credentialVerification?.anabinRecognition && (
+                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-100 text-royal border border-blue-200">
+                                  Anabin {m.credentialVerification.anabinRecognition}
+                                </span>
+                              )}
+
+                              {/* Category C: MOI Waiver Applied Badge */}
+                              {m.moiWaiver?.waiverApplied && (
+                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">
+                                  MOI English Waiver Applied ✅
+                                </span>
+                              )}
                             </div>
+
                             <h3 className="text-xl font-bold font-outfit text-slate-navy">{m.programTitle}</h3>
                             <div className="flex items-center gap-2 mt-1">
                               <p className="text-xs font-semibold text-royal">{m.universityName}</p>
@@ -546,11 +693,18 @@ function MatchContent() {
                                     countryName: m.countryName,
                                     countryIsoCode: m.countryIsoCode,
                                     domain: m.domain,
-                                    tuitionFeeLocal: m.tuitionFeeLocal,
-                                    currencyCode: m.currencyCode,
+                                    tuitionFeeLocal: m.tuitionFeeLocal || 0,
+                                    currencyCode: m.currencyCode || 'USD',
                                     qualificationStatus: m.qualificationStatus,
                                     matchFitScorePct: m.matchFitScorePct,
-                                    requirements: m.requirements,
+                                    requirements: {
+                                      minGpa: m.requirements.minGpa,
+                                      minIelts: m.requirements.minIelts,
+                                      minToefl: m.requirements.minToefl || null,
+                                      minGre: m.requirements.minGre,
+                                      workExpYearsRequired: m.requirements.workExpYearsRequired,
+                                      requiresPapers: m.requirements.requiresPapers,
+                                    },
                                     scholarshipOffer: m.scholarshipOffer,
                                     officialSourceUrl: m.officialSourceUrl || m.sourceUrl,
                                     applicationDeadline: m.applicationDeadline,
@@ -589,7 +743,13 @@ function MatchContent() {
                           </div>
                           <div>
                             <span className="block text-slate-400 text-[10px]">Language Score</span>
-                            <span className="font-bold text-slate-800">{m.requirements?.minIelts ? `IELTS ${m.requirements.minIelts}+` : 'English Waiver'}</span>
+                            <span className="font-bold text-slate-800">
+                              {m.moiWaiver?.waiverApplied
+                                ? 'MOI Waived'
+                                : m.requirements?.minIelts
+                                ? `IELTS ${m.requirements.minIelts}+`
+                                : 'English Standard'}
+                            </span>
                           </div>
                           <div>
                             <span className="block text-slate-400 text-[10px]">Annual Tuition</span>
@@ -602,6 +762,46 @@ function MatchContent() {
                             <span className="font-bold text-amber-700">{m.scholarshipOffer?.publishedRules?.length || 0} Scope(s)</span>
                           </div>
                         </div>
+
+                        {/* Category A: ECTS Prerequisite Diagnostic Callout */}
+                        {m.prerequisiteEvaluation && m.prerequisiteEvaluation.status !== 'NOT_APPLICABLE' && (
+                          <div className={`p-3 rounded-xl border text-xs flex items-center justify-between font-mono ${
+                            m.prerequisiteEvaluation.status === 'PREREQUISITES_SATISFIED'
+                              ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                              : m.prerequisiteEvaluation.status === 'CONDITIONAL_BRIDGE_ELIGIBLE'
+                              ? 'bg-amber-50/70 border-amber-200 text-amber-900'
+                              : 'bg-rose-50/70 border-rose-200 text-rose-900'
+                          }`}>
+                            <div className="flex items-center gap-2">
+                              {m.prerequisiteEvaluation.status === 'PREREQUISITES_SATISFIED' ? (
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                              ) : (
+                                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                              )}
+                              <span><strong>Prerequisite Check:</strong> {m.prerequisiteEvaluation.summaryMessage}</span>
+                            </div>
+                            {m.prerequisiteEvaluation.deficits.totalDeficitEcts > 0 && (
+                              <span className="font-bold text-[11px] px-2 py-0.5 rounded bg-white/80 border border-slate-200">
+                                Deficit: {m.prerequisiteEvaluation.deficits.totalDeficitEcts} ECTS
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Category C: Document Checklist Summary */}
+                        {m.documentChecklist && (
+                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-mono flex flex-wrap items-center justify-between gap-2 text-slate-700">
+                            <span className="flex items-center gap-1 font-bold text-slate-900">
+                              <FileText className="w-3.5 h-3.5 text-royal" /> Application Docs:
+                            </span>
+                            <span>SOP Limit: <strong>Max {m.documentChecklist.sopMaxWords} Words</strong></span>
+                            <span>• Academic LORs: <strong>{m.documentChecklist.lorAcademicCount} Required</strong></span>
+                            <span>• CV Standard: <strong>{m.documentChecklist.cvFormatRequired}</strong></span>
+                            {m.documentChecklist.portfolioRequired && (
+                              <span className="text-amber-700 font-bold">• Portfolio/GitHub Required</span>
+                            )}
+                          </div>
+                        )}
 
                         {/* Gap Analysis & Prerequisite Diagnostics (if REACH) */}
                         {m.qualificationStatus === 'REACH' && (gpaDeficit > 0 || ieltsDeficit > 0) && (
@@ -616,7 +816,7 @@ function MatchContent() {
                                   • <strong>GPA Gap:</strong> Current effective score is {effectiveGpaUsed.toFixed(2)}, which is {gpaDeficit.toFixed(2)} points below the {m.requirements.minGpa.toFixed(2)} cutoff. {persona === 'STUDENT' ? 'Adding 2+ years of relevant industry experience or 1 published research paper will boost your holistic score into the qualified zone.' : 'Consider selecting DIRECT relevance if your work aligns with this field.'}
                                 </p>
                               )}
-                              {ieltsDeficit > 0 && (
+                              {ieltsDeficit > 0 && !m.moiWaiver?.waiverApplied && (
                                 <p>
                                   • <strong>Language Gap:</strong> Required score is IELTS {m.requirements.minIelts} (Current: {ielts}). Retaking IELTS or scoring 95+ on TOEFL iBT will satisfy this criterion.
                                 </p>
@@ -638,7 +838,7 @@ function MatchContent() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const ics = generateIcsMilestoneCalendar(m.programTitle, m.universityName, m.milestones);
+                                    const ics = generateIcsMilestoneCalendar(m.programTitle, m.universityName, m.milestones!);
                                     downloadIcsFile(`${m.universityName.replace(/[^a-zA-Z0-9]/g, '_')}_milestones.ics`, ics);
                                   }}
                                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-blue-200 text-royal hover:bg-blue-50 text-[10px] font-mono font-bold transition-all shadow-sm"

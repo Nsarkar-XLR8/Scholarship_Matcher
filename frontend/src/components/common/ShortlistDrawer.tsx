@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookmarkCheck, X, Columns3, Trash2, ExternalLink, ArrowRight, Award, ShieldCheck, CheckCircle2, AlertTriangle, Building2, Globe } from 'lucide-react';
+import { BookmarkCheck, X, Columns3, Trash2, ExternalLink, ArrowRight, Award, ShieldCheck, CheckCircle2, AlertTriangle, Building2, Globe, Printer, Share2, Check, FileText } from 'lucide-react';
 import { useShortlist } from '@/context/ShortlistContext';
 import ConfidenceBadge from './ConfidenceBadge';
 import { formatOfficialUrl } from '@/lib/url-formatter.util';
@@ -16,7 +16,22 @@ export default function ShortlistDrawer() {
     setIsComparisonOpen,
   } = useShortlist();
 
+  const [copiedLink, setCopiedLink] = useState<boolean>(false);
+
   if (shortlist.length === 0) return null;
+
+  const handleCopyShareLink = () => {
+    const ids = shortlist.map((p) => p.programId).join(',');
+    const url = `${window.location.origin}/comparison?compare=${encodeURIComponent(ids)}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 3000);
+    });
+  };
+
+  const handlePrintPdf = () => {
+    window.print();
+  };
 
   return (
     <>
@@ -27,7 +42,7 @@ export default function ShortlistDrawer() {
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 50, opacity: 0 }}
-            className="fixed bottom-6 inset-x-0 z-40 max-w-2xl mx-auto px-4 pointer-events-none"
+            className="fixed bottom-6 inset-x-0 z-40 max-w-2xl mx-auto px-4 pointer-events-none print:hidden"
           >
             <div className="pointer-events-auto bg-slate-900/90 text-white backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-3 sm:p-4 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -72,7 +87,7 @@ export default function ShortlistDrawer() {
       <AnimatePresence>
         {isComparisonOpen && (
           <div 
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/70 backdrop-blur-md overflow-y-auto"
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/70 backdrop-blur-md overflow-y-auto print:p-0 print:bg-white print:static"
             data-lenis-prevent="true"
           >
             <motion.div
@@ -80,25 +95,49 @@ export default function ShortlistDrawer() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               data-lenis-prevent="true"
-              className="relative w-full max-w-6xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto max-h-[92vh] flex flex-col"
+              className="relative w-full max-w-6xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto max-h-[92vh] flex flex-col print:max-h-none print:shadow-none print:border-none print:rounded-none"
             >
               {/* Header */}
-              <div className="bg-slate-900 text-white p-6 flex justify-between items-center border-b border-slate-800 shrink-0">
+              <div className="bg-slate-900 text-white p-6 flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-slate-800 shrink-0 print:bg-white print:text-slate-900 print:border-b-2 print:border-slate-300 print:p-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-500/40 flex items-center justify-center text-blue-400">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-500/40 flex items-center justify-center text-blue-400 print:hidden">
                     <Columns3 className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-extrabold font-outfit text-white">
-                      Side-by-Side Program Comparison
+                    <h2 className="text-xl sm:text-2xl font-extrabold font-outfit text-white print:text-slate-900">
+                      Side-by-Side Master's Comparison Matrix
                     </h2>
-                    <p className="text-slate-400 text-xs mt-0.5">
-                      Comparing {shortlist.length} selected candidate programs across verified criteria
+                    <p className="text-slate-400 print:text-slate-600 text-xs mt-0.5">
+                      Comparing {shortlist.length} selected candidate programs across verified criteria & proof-of-funds rules
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 print:hidden">
+                  <button
+                    type="button"
+                    onClick={handleCopyShareLink}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                      copiedLink
+                        ? 'bg-emerald-500 text-white'
+                        : 'bg-white/10 hover:bg-white/20 text-white'
+                    }`}
+                    title="Copy stateless shareable URL"
+                  >
+                    {copiedLink ? <Check className="w-3.5 h-3.5" /> : <Share2 className="w-3.5 h-3.5" />}
+                    <span>{copiedLink ? 'Link Copied!' : 'Share Matrix'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handlePrintPdf}
+                    className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-colors flex items-center gap-1.5"
+                    title="Export Comparison PDF"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Download PDF</span>
+                  </button>
+
                   <button
                     onClick={clearShortlist}
                     className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-medium transition-colors"
@@ -116,7 +155,7 @@ export default function ShortlistDrawer() {
 
               {/* Scrollable Matrix Table */}
               <div 
-                className="p-6 overflow-x-auto overflow-y-auto flex-1 overscroll-contain"
+                className="p-6 overflow-x-auto overflow-y-auto flex-1 overscroll-contain print:p-2"
                 data-lenis-prevent="true"
               >
                 <table className="w-full text-left border-collapse min-w-[700px]">
@@ -141,7 +180,7 @@ export default function ShortlistDrawer() {
                             </div>
                             <button
                               onClick={() => removeFromShortlist(prog.programId)}
-                              className="text-slate-400 hover:text-red-500 p-1 transition-colors"
+                              className="text-slate-400 hover:text-red-500 p-1 transition-colors print:hidden"
                               title="Remove"
                             >
                               <X className="w-4 h-4" />
@@ -264,7 +303,10 @@ export default function ShortlistDrawer() {
               </div>
 
               {/* Footer */}
-              <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-end">
+              <div className="bg-slate-50 p-4 border-t border-slate-200 flex justify-between items-center print:hidden">
+                <span className="text-xs text-slate-500 font-mono">
+                  100% Stateless Zero-Auth Platform • Verified Admissions Knowledge
+                </span>
                 <button
                   type="button"
                   onClick={() => setIsComparisonOpen(false)}

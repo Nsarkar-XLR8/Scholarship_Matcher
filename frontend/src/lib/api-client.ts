@@ -34,6 +34,115 @@ export interface MatchRequest {
   targetField: string;
   targetDegree?: 'MASTERS' | 'MS' | 'MENG' | 'MBA';
   preferredCountryIsoCodes?: string[];
+
+  // Category A & C
+  mathCredits?: number;
+  csCredits?: number;
+  theoryCredits?: number;
+  creditScale?: 'ECTS' | 'US_SEMESTER' | 'INDIAN_SEMESTER' | 'UK_CATS';
+  undergradTaughtInEnglish?: boolean;
+  applicantCountryIsoCode?: string;
+}
+
+export interface PrerequisiteEvaluation {
+  status: 'PREREQUISITES_SATISFIED' | 'CONDITIONAL_BRIDGE_ELIGIBLE' | 'HARD_PREREQUISITE_DEFICIT' | 'NOT_APPLICABLE';
+  normalizedStudentCredits: {
+    mathEcts: number;
+    csEcts: number;
+    theoreticalEcts: number;
+    scaleUsed: string;
+  };
+  deficits: {
+    mathDeficitEcts: number;
+    csDeficitEcts: number;
+    theoreticalDeficitEcts: number;
+    totalDeficitEcts: number;
+  };
+  summaryMessage: string;
+  isEligibleForAdmission: boolean;
+}
+
+export interface MatchProgramItem {
+  programId: string;
+  programTitle: string;
+  fieldOfStudy: string;
+  universityName: string;
+  domain: string;
+  officialWebsiteUrl?: string;
+  sourceUrl?: string;
+  officialSourceUrl?: string;
+  officialSourceProvider?: string;
+  applicationDeadline?: string;
+  intakeSeason?: string;
+  tuitionFeeLocal?: number;
+  currencyCode?: string;
+  milestones?: {
+    languageTestBy: string;
+    documentLegalizationBy: string;
+    portalSubmissionWindow: string;
+    expectedDecisionDate: string;
+    visaAppointmentBy: string;
+  };
+  campusName: string;
+  campusCity?: string;
+  latitude?: number;
+  longitude?: number;
+  countryName: string;
+  countryIsoCode: string;
+  qualificationStatus: 'QUALIFIED' | 'REACH' | 'SAFETY';
+  matchFitScorePct: number;
+  requirements: {
+    minGpa: number;
+    minIelts: number | null;
+    minToefl?: number | null;
+    minDuolingo?: number | null;
+    minPte?: number | null;
+    minGre: number | null;
+    workExpYearsRequired?: number;
+    requiresPapers: boolean;
+    minMathEcts?: number;
+    minCsEcts?: number;
+    minTheoreticalEcts?: number;
+    acceptsMoiEnglishWaiver?: boolean;
+  };
+  prerequisiteEvaluation?: PrerequisiteEvaluation;
+  moiWaiver?: {
+    acceptedByProgram: boolean;
+    waiverApplied: boolean;
+    note: string;
+  };
+  credentialVerification?: {
+    apsRequired: boolean;
+    anabinRecognition: string;
+    uniAssistVpdRequired: boolean;
+  };
+  documentChecklist?: {
+    sopMaxWords: number;
+    lorAcademicCount: number;
+    lorProfessionalCount: number;
+    cvFormatRequired: string;
+    portfolioRequired: boolean;
+  };
+  scholarshipOffer: {
+    publishedRules: Array<{
+      ruleId: string;
+      title: string;
+      scope: string;
+      type: string;
+      calculatedPct: number;
+      confidence: 'VERIFIED' | 'SCRAPED_UNVERIFIED' | 'CROWDSOURCED';
+      description: string | null;
+      sourceUrl: string;
+      officialSourceUrl?: string;
+      officialSourceProvider?: string;
+    }>;
+    crowdsourcedDistribution: {
+      reportCount: number;
+      p25ScholarshipPct: number;
+      medianScholarshipPct: number;
+      p75ScholarshipPct: number;
+    } | null;
+  };
 }
 
 export interface MatchResult {
@@ -46,63 +155,7 @@ export interface MatchResult {
     yearsExp: number;
     relevance: 'DIRECT' | 'ADJACENT' | 'GENERAL';
   };
-  matches: Array<{
-    programId: string;
-    programTitle: string;
-    fieldOfStudy: string;
-    universityName: string;
-    domain: string;
-    officialWebsiteUrl?: string;
-    sourceUrl?: string;
-    officialSourceUrl?: string;
-    officialSourceProvider?: string;
-    applicationDeadline?: string;
-    intakeSeason?: string;
-    tuitionFeeLocal?: number;
-    currencyCode?: string;
-    milestones?: {
-      languageTestBy: string;
-      documentLegalizationBy: string;
-      portalSubmissionWindow: string;
-      expectedDecisionDate: string;
-      visaAppointmentBy: string;
-    };
-    campusName: string;
-    countryName: string;
-    countryIsoCode: string;
-    qualificationStatus: 'QUALIFIED' | 'REACH' | 'SAFETY';
-    matchFitScorePct: number;
-    requirements: {
-      minGpa: number;
-      minIelts: number | null;
-      minToefl?: number | null;
-      minDuolingo?: number | null;
-      minPte?: number | null;
-      minGre: number | null;
-      workExpYearsRequired?: number;
-      requiresPapers: boolean;
-    };
-    scholarshipOffer: {
-      publishedRules: Array<{
-        ruleId: string;
-        title: string;
-        scope: string;
-        type: string;
-        calculatedPct: number;
-        confidence: 'VERIFIED' | 'SCRAPED_UNVERIFIED' | 'CROWDSOURCED';
-        description: string | null;
-        sourceUrl: string;
-        officialSourceUrl?: string;
-        officialSourceProvider?: string;
-      }>;
-      crowdsourcedDistribution: {
-        reportCount: number;
-        p25ScholarshipPct: number;
-        medianScholarshipPct: number;
-        p75ScholarshipPct: number;
-      } | null;
-    };
-  }>;
+  matches: MatchProgramItem[];
 }
 
 export interface SearchRequest {
@@ -135,6 +188,10 @@ export interface TreeProgram {
   universityId: string;
   universityName: string;
   domain: string;
+  campusName?: string;
+  campusCity?: string;
+  latitude?: number;
+  longitude?: number;
   requirements: {
     minGpa: number;
     minIelts: number | null;
@@ -142,6 +199,17 @@ export interface TreeProgram {
     minGre: number | null;
     workExpYearsRequired: number;
     requiresPapers: boolean;
+    minMathEcts?: number;
+    minCsEcts?: number;
+    minTheoreticalEcts?: number;
+    acceptsMoiEnglishWaiver?: boolean;
+  };
+  documentChecklist?: {
+    sopMaxWords: number;
+    lorAcademicCount: number;
+    lorProfessionalCount: number;
+    cvFormatRequired: string;
+    portfolioRequired: boolean;
   };
   scholarshipRules: Array<{
     id: string;
@@ -170,6 +238,12 @@ export interface TreeCountry {
     inStudyHoursPerWeek: number;
     pathwayToPermanentRes: string;
     medianGraduateSalaryUsd: number;
+    monthlyBlockedAccountLocal?: number;
+    blockedAccountCurrency?: string;
+    proofOfFundsMonths?: number;
+    requiresApsCertificate?: boolean;
+    anabinRecognitionType?: string;
+    uniAssistVpdRequired?: boolean;
   };
   stats: {
     programCount: number;
@@ -220,6 +294,89 @@ export interface UNGeographicProgramTreeResponse {
     generatedAt: string;
     source: string;
   };
+}
+
+export interface CountryIndustryIntelligence {
+  studentMinWageHourlyLocal: number;
+  minWageCurrency: string;
+  studentMinWageHourlyConverted: number;
+  inStudyWorkLimitFormatted: string;
+  taxFreeAllowanceAnnualLocal: number;
+  spousalWorkRightsPolicy: string;
+  spouseWorkAllowed: boolean;
+  permanentResidencyPathway: string;
+  prTimelineYears: number;
+  mandatoryHealthcareMonthlyLocal: number;
+  mandatoryHealthcareMonthlyConverted: number;
+  healthcareCurrency: string;
+  englishProficiencyRank: string;
+  housingStrainIndex: 'MODERATE' | 'HIGH' | 'CRITICAL';
+}
+
+export interface CountryComparisonItem {
+  isoCode: string;
+  countryName: string;
+  regionName: string;
+  continentName: string;
+  nativeCurrency: string;
+  displayCurrency: string;
+  tuitionRangeAnnual: {
+    min: number;
+    max: number;
+  };
+  estMonthlyLivingCost: number;
+  universitiesCount: number;
+  countryScholarshipsCount: number;
+  dataCompletenessPct: number;
+  visaAndWorkProfile?: {
+    postStudyWorkMonths: number;
+    permitName: string;
+    inStudyWorkHoursWeekly: number;
+    allowsSpouseWork: boolean;
+    pathwayToPR: string;
+    medianGraduateSalary: number;
+    totalEstimatedInvestment2Yr: number;
+    estimatedPaybackYears: number;
+    monthlyBlockedAccountLocal: number;
+    blockedAccountCurrency: string;
+    requiresApsCertificate: boolean;
+    anabinRecognitionType: string;
+  } | null;
+  industryIntelligence: CountryIndustryIntelligence;
+}
+
+export interface StatutoryProofOfFundsItem {
+
+  countryIsoCode: string;
+  countryName: string;
+  nativeCurrency: string;
+  displayCurrency: string;
+  statutoryMonthlyLocal: number;
+  statutoryAnnualLocal: number;
+  statutoryMonthlyConverted: number;
+  statutoryAnnualConverted: number;
+  mandatoryInsuranceBufferConverted: number;
+  recommendedFxBufferConverted: number;
+  totalStatutoryDepositRequired: number;
+  durationMonthsRequired: number;
+  permitRegulationName: string;
+  netBlockedDepositAfterScholarship?: {
+    scholarshipAnnualStipend: number;
+    netBlockedDepositRequired: number;
+    isFullyWaivedByScholarship: boolean;
+  };
+}
+
+export interface LoanEstimationResult {
+  universityRanking: number;
+  degreeLevel: string;
+  isEligibleForNoCosignerLoan: boolean;
+  lenderOptions: string[];
+  maxEstimatedBorrowingCapacityUsd: number;
+  estimatedInterestRatePct: number;
+  estimatedMonthlyRepayment10YrUsd: number;
+  totalRepayment10YrUsd: number;
+  summary: string;
 }
 
 export interface OutcomeDistributionItem {
@@ -350,5 +507,28 @@ export const fetchOutcomeStats = async (): Promise<OutcomeGlobalStats> => {
 
 export const compareCountries = async (codes: string[], currency = 'USD') => {
   const res = await apiClient.get(`/comparison/countries?codes=${codes.join(',')}&currency=${currency}`);
+  return res.data;
+};
+
+export const fetchProofOfFundsMatrix = async (
+  codes: string[] = ['DE', 'NL', 'GB', 'US', 'MY', 'CA', 'AU', 'SE', 'SG', 'FR'],
+  currency = 'USD',
+  scholarshipAnnualAward = 0
+): Promise<StatutoryProofOfFundsItem[]> => {
+  const res = await apiClient.get(
+    `/comparison/proof-of-funds?codes=${codes.join(',')}&currency=${currency}&scholarshipAnnualAward=${scholarshipAnnualAward}`
+  );
+  return res.data;
+};
+
+export const fetchLoanEstimate = async (
+  tuitionUsd = 35000,
+  qsRanking = 50,
+  degreeLevel = 'MS',
+  fieldOfStudy = 'Computer Science'
+): Promise<LoanEstimationResult> => {
+  const res = await apiClient.get(
+    `/comparison/loans?tuitionUsd=${tuitionUsd}&qsRanking=${qsRanking}&degreeLevel=${degreeLevel}&fieldOfStudy=${encodeURIComponent(fieldOfStudy)}`
+  );
   return res.data;
 };

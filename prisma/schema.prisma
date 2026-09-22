@@ -59,17 +59,23 @@ model Country {
 }
 
 model CountryWorkAndVisaProfile {
-  id                      String   @id @default(uuid())
-  countryId               String   @unique
-  country                 Country  @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  id                         String   @id @default(uuid())
+  countryId                  String   @unique
+  country                    Country  @relation(fields: [countryId], references: [id], onDelete: Cascade)
   
-  postStudyWorkMonths     Int      @default(12) // e.g. 18 in Germany, 24 in UK, 36 in US STEM
-  postStudyWorkPermitName String   @default("Graduate Work Visa") // e.g. "Jobseeker Permit §20 AufenthG", "Graduate Route", "STEM OPT"
-  inStudyWorkHoursPerWeek Int      @default(20) // Part-time allowed during semester
-  allowsSpouseWorkVisa    Boolean  @default(false)
-  pathwayToPermanentRes   String   // e.g. "EU Blue Card (21 mos with B1 German / 27 mos with A1 German)"
-  minBlockedAccountUsd    Float    @default(0.0) // Proof of living funds (e.g. €992/mo = $1,080/mo)
-  medianGraduateSalaryUsd Float    @default(0.0) // National median starting salary for Master's graduates
+  postStudyWorkMonths        Int      @default(12) // e.g. 18 in Germany, 24 in UK, 36 in US STEM
+  postStudyWorkPermitName    String   @default("Graduate Work Visa") // e.g. "Jobseeker Permit §20 AufenthG", "Graduate Route", "STEM OPT"
+  inStudyWorkHoursPerWeek    Int      @default(20) // Part-time allowed during semester
+  allowsSpouseWorkVisa       Boolean  @default(false)
+  pathwayToPermanentRes      String   // e.g. "EU Blue Card (21 mos with B1 German / 27 mos with A1 German)"
+  minBlockedAccountUsd       Float    @default(0.0) // Proof of living funds (e.g. €992/mo = $1,080/mo)
+  monthlyBlockedAccountLocal Float    @default(0.0) // Statutory local currency escrow per month (e.g. 992 in DE, 1208 in NL, 1023 in UK)
+  blockedAccountCurrency     String   @default("EUR") // Native statutory currency code (e.g. "EUR", "GBP", "SEK")
+  proofOfFundsMonths         Int      @default(12) // Number of months required for visa escrow
+  requiresApsCertificate     Boolean  @default(false) // Mandatory APS certificate rule (e.g. for India, China, Vietnam applicants to Germany)
+  anabinRecognitionType      String   @default("H+") // German Anabin state recognition level ("H+", "H+/-")
+  uniAssistVpdRequired       Boolean  @default(false) // Whether uni-assist Preliminary Review Documentation is required
+  medianGraduateSalaryUsd    Float    @default(0.0) // National median starting salary for Master's graduates
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -109,6 +115,8 @@ model Campus {
   country      Country    @relation(fields: [countryId], references: [id])
   name         String     // e.g. "Main Campus", "Abu Dhabi Campus", "Malaysia Campus"
   city         String
+  latitude     Float      @default(0.0)
+  longitude    Float      @default(0.0)
 
   programs     Program[]
 
@@ -152,6 +160,13 @@ model Program {
   lastVerifiedAt         DateTime             @default(now())
   isActive               Boolean              @default(true)
 
+  // Document & Application Requirements
+  sopMaxWords            Int                  @default(1000)
+  lorAcademicCount       Int                  @default(2)
+  lorProfessionalCount   Int                  @default(0)
+  cvFormatRequired       String               @default("STANDARD") // "EUROPASS", "STANDARD_1PAGE"
+  portfolioRequired      Boolean              @default(false)
+
   requirements           ProgramRequirement[]
   scholarshipRules       ScholarshipRule[]  // Program-specific scholarships
   outcomeReports         OutcomeReport[]
@@ -172,26 +187,33 @@ enum ConfidenceLevel {
 }
 
 model ProgramRequirement {
-  id                   String          @id @default(uuid())
-  programId            String
-  program              Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
-  minGpa               Float           @default(0.0) // Normalized to 4.0 scale
-  minGpaOriginal       Float           @default(0.0)
-  gpaScale             Float           @default(4.0)
-  gpaScaleName         String          @default("US 4.0") // e.g. "US 4.0", "German Inverse 1.0-4.0", "UK Honours", "Indian 10.0 CGPA"
-  minIelts             Float?
-  minToefl             Int?
-  minDuolingo          Int?
-  minPte               Int?
-  minGre               Int?
-  minGmat              Int?
-  workExpYearsRequired Int             @default(0)
-  requiresPapers       Boolean         @default(false)
-  minPapersCount       Int             @default(0)
-  sourceUrl            String
-  confidence           ConfidenceLevel @default(VERIFIED)
-  validFrom            DateTime        @default(now())
-  validTo              DateTime?       // NULL indicates current active requirement
+  id                      String          @id @default(uuid())
+  programId               String
+  program                 Program         @relation(fields: [programId], references: [id], onDelete: Cascade)
+  minGpa                  Float           @default(0.0) // Normalized to 4.0 scale
+  minGpaOriginal          Float           @default(0.0)
+  gpaScale                Float           @default(4.0)
+  gpaScaleName            String          @default("US 4.0") // e.g. "US 4.0", "German Inverse 1.0-4.0", "UK Honours", "Indian 10.0 CGPA"
+  minIelts                Float?
+  minToefl                Int?
+  minDuolingo             Int?
+  minPte                  Int?
+  minGre                  Int?
+  minGmat                 Int?
+  workExpYearsRequired    Int             @default(0)
+  requiresPapers          Boolean         @default(false)
+  minPapersCount          Int             @default(0)
+  
+  // ECTS Prerequisite Credit Barriers
+  minMathEcts             Float           @default(0.0) // e.g. 18.0 ECTS in Calculus/Linear Algebra/Statistics
+  minCsEcts               Float           @default(0.0) // e.g. 15.0 ECTS in Programming/Algorithms/Data Structures
+  minTheoreticalEcts      Float           @default(0.0) // e.g. 10.0 ECTS in Automata/Complexity
+  acceptsMoiEnglishWaiver Boolean         @default(false) // Whether 100% English medium undergraduate degree waives IELTS/TOEFL
+
+  sourceUrl               String
+  confidence              ConfidenceLevel @default(VERIFIED)
+  validFrom               DateTime        @default(now())
+  validTo                 DateTime?       // NULL indicates current active requirement
 
   createdAt DateTime @default(now())
 
